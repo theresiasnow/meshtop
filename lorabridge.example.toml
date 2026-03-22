@@ -1,0 +1,31 @@
+[source]
+type = "serial"          # "serial" or "lora"
+port = "COM3"            # or "/dev/ttyUSB0"
+baud = 9600
+
+[source.lora]
+broker   = "eu1.cloud.thethings.network"
+port     = 1883
+username = "my-app@ttn"
+password = "NNSXS.xxx"
+topic    = "v3/+/devices/+/up"
+
+[nmea_server]
+enabled = true
+port    = 10110          # pi-star points here
+
+[aprs]
+enabled   = true
+callsign  = "SM5XYZ-9"
+passcode  = 12345
+server    = "rotate.aprs2.net"
+port      = 14580
+interval  = 60           # seconds between beacons
+
+[gpsd]
+enabled = true
+port    = 2947
+
+[rigtop]
+enabled = false
+port    = 10111

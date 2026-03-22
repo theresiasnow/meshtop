@@ -1,0 +1,82 @@
+[project]
+name = "lorabridge"
+version = "0.1.0"
+description = "GPS bridge for Seeed Wio Tracker — forwards to pi-star, APRS-IS, gpsd, rigtop"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "loguru>=0.7",
+    "paho-mqtt>=2.0",
+    "pydantic>=2.0",
+    "pynmea2>=1.19",
+    "pyserial>=3.5",
+    "rich>=13.0",
+]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.0",
+    "pylint>=3.0",
+    "pytest>=8.0",
+    "ruff>=0.15",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+lorabridge = "lorabridge.cli:main"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", "I", "UP", "B", "SIM", "RUF", "PTH", "PIE", "TRY", "G", "C4", "PERF",
+]
+ignore = [
+    "RUF001",
+    "SIM102",
+    "SIM105",
+    "SIM108",
+    "SIM114",
+    "TRY003",
+    "TRY301",
+    "PIE790",
+    "G004",
+]
+
+[tool.commitizen]
+version_provider = "pep621"
+tag_format = "v$version"
+update_changelog_on_bump = true
+major_version_zero = true
+
+[tool.pylint.main]
+py-version = "3.12"
+jobs = 0
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-branches",
+    "too-many-statements",
+    "import-outside-toplevel",
+    "protected-access",
+    "fixme",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.design]
+max-args = 12
+max-bool-expr = 6
