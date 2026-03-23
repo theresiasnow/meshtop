@@ -520,7 +520,7 @@ class LorabridgeApp(App[None]):
         with Horizontal(id="cmd-bar"):
             yield Label("❯ ", id="cmd-prompt")
             yield Input(
-                placeholder="ble  •  serial  •  msg <NODE_ID> <text>  •  beacon on/off  •  pos",
+                placeholder="ble on/off  •  serial on/off  •  msg <NODE_ID> <text>  •  beacon on/off  •  pos",
                 id="cmd-input",
                 suggester=CommandSuggester(),
             )
