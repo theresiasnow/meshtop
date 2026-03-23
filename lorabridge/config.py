@@ -1,7 +1,7 @@
+import tomllib
 from pathlib import Path
 from typing import Literal
 
-import tomllib
 from pydantic import BaseModel
 
 
@@ -19,13 +19,20 @@ class LoraSourceConfig(BaseModel):
     topic: str = "msh/EU_868/SE/#"
     node_id: str = ""                        # e.g. "!7a78e5e3" — filter to own node only
     channels: dict[str, ChannelConfig] = {}  # channel name -> config
+    # Meshtastic TCP server for sending (e.g. "192.168.1.100")
+    device_host: str = ""
+
+
+class BleSourceConfig(BaseModel):
+    device: str = ""   # device name or BLE address; empty = auto-discover first found
 
 
 class SourceConfig(BaseModel):
-    type: Literal["serial", "lora"] = "serial"
+    type: Literal["serial", "lora", "ble", "none"] = "none"
     port: str = "COM3"
     baud: int = 9600
     lora: LoraSourceConfig = LoraSourceConfig()
+    ble: BleSourceConfig = BleSourceConfig()
 
 
 class NmeaServerConfig(BaseModel):
@@ -40,6 +47,7 @@ class AprsConfig(BaseModel):
     server: str = "rotate.aprs2.net"
     port: int = 14580
     interval: int = 60
+    comment: str = "lorabridge"
 
 
 class GpsdConfig(BaseModel):

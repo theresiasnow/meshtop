@@ -1,4 +1,4 @@
-"""Meshtastic USB-serial source (direct device connection, no gateway)."""
+"""Meshtastic Bluetooth BLE source (wireless direct connection, no gateway)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from lorabridge.config import SourceConfig
 from lorabridge.sources._mesh_decode import decode_packet
 
 
-class SerialSource:
+class BleSource:
     def __init__(
         self,
         cfg: SourceConfig,
@@ -32,8 +32,27 @@ class SerialSource:
         self._disconnect_sub = None
 
     def start(self) -> None:
-        from meshtastic.serial_interface import SerialInterface
+        from meshtastic.ble_interface import BLEClient, BLEInterface
         from pubsub import pub
+
+        device = self._cfg.ble.device or None  # None = auto-discover first device
+
+        # Subclass BLEInterface to call pair() before discover() so that a single
+        # `ble on` handles first-time bonding without a "connect again" round-trip.
+        class _PairableBLEInterface(BLEInterface):
+            def connect(self, address=None):
+                ble_device = self.find_device(address)
+                client = BLEClient(
+                    ble_device.address, disconnected_callback=lambda _: self.close()
+                )
+                client.connect()
+                try:
+                    client.pair()
+                    logger.debug("BLE pair() succeeded (or already bonded)")
+                except Exception as pair_exc:
+                    logger.debug(f"BLE pair() skipped: {pair_exc}")
+                client.discover()
+                return client
 
         def on_receive(packet, interface) -> None:
             decode_packet(
@@ -42,16 +61,17 @@ class SerialSource:
                 on_telemetry=self._on_telemetry,
                 on_nodeinfo=self._on_nodeinfo,
                 on_text=self._on_text,
-                source_tag="serial",
+                source_tag="ble",
             )
 
         def on_connect(interface, topic=pub.AUTO_TOPIC) -> None:
-            logger.info(f"Meshtastic serial connected: {self._cfg.port}")
+            name = device or "auto"
+            logger.info(f"Meshtastic BLE connected: {name}")
             if self._on_status:
                 self._on_status(True)
 
         def on_disconnect(interface, topic=pub.AUTO_TOPIC) -> None:
-            logger.warning("Meshtastic serial disconnected")
+            logger.warning("Meshtastic BLE disconnected")
             if self._on_status:
                 self._on_status(False)
 
@@ -63,13 +83,9 @@ class SerialSource:
         pub.subscribe(on_connect, "meshtastic.connection.established")
         pub.subscribe(on_disconnect, "meshtastic.connection.lost")
 
-        try:
-            self._iface = SerialInterface(self._cfg.port, timeout=30)
-        except Exception:
-            import gc
-            gc.collect()  # ensure partially-constructed SerialInterface releases the port
-            raise
-        logger.info(f"SerialSource started on {self._cfg.port}")
+        logger.info(f"BleSource connecting to {device or 'first available device'}…")
+        self._iface = _PairableBLEInterface(device)
+        logger.info("BleSource started")
 
     def stop(self) -> None:
         try:
@@ -88,4 +104,4 @@ class SerialSource:
             except Exception:
                 pass
             self._iface = None
-        logger.info("SerialSource stopped")
+        logger.info("BleSource stopped")

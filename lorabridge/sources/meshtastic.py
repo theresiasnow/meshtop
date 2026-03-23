@@ -1,19 +1,19 @@
 import base64
 import struct
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Callable
+from datetime import UTC, datetime
 
 import paho.mqtt.client as mqtt
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from loguru import logger
 from meshtastic.protobuf import portnums_pb2
-from meshtastic.protobuf.mesh_pb2 import MeshPacket, Position as MeshPosition, User
+from meshtastic.protobuf.mesh_pb2 import MeshPacket, User
+from meshtastic.protobuf.mesh_pb2 import Position as MeshPosition
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
-
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
 
 from lorabridge.config import LoraSourceConfig
 from lorabridge.position import Position
@@ -26,7 +26,7 @@ class DeviceMetrics:
     uptime_seconds: int = 0
     channel_utilization: float = 0.0
     air_util_tx: float = 0.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -43,13 +43,14 @@ class TextMessage:
     to_id: str = ""
     text: str = ""
     channel: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 PositionCallback = Callable[[Position], None]
 TelemetryCallback = Callable[[DeviceMetrics], None]
 NodeInfoCallback = Callable[[NodeInfo], None]
 TextCallback = Callable[[TextMessage], None]
+MqttStatusCallback = Callable[[bool], None]
 
 
 class MeshtasticSource:
@@ -60,12 +61,14 @@ class MeshtasticSource:
         on_telemetry: TelemetryCallback | None = None,
         on_nodeinfo: NodeInfoCallback | None = None,
         on_text: TextCallback | None = None,
+        on_mqtt_status: MqttStatusCallback | None = None,
     ) -> None:
         self._cfg = cfg
         self._on_position = on_position
         self._on_telemetry = on_telemetry
         self._on_nodeinfo = on_nodeinfo
         self._on_text = on_text
+        self._on_mqtt_status = on_mqtt_status
         # Build channel key lookup: channel_name -> bytes
         self._channel_keys: dict[str, bytes] = {}
         self._enabled_channels: set[str] = set()
@@ -77,6 +80,7 @@ class MeshtasticSource:
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._client.username_pw_set(cfg.username, cfg.password)
         self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
         self._thread: threading.Thread | None = None
 
@@ -99,6 +103,13 @@ class MeshtasticSource:
     def _on_connect(self, client, userdata, flags, rc, properties=None) -> None:
         logger.info(f"MQTT connected rc={rc}, subscribing to {self._cfg.topic}")
         client.subscribe(self._cfg.topic)
+        if self._on_mqtt_status:
+            self._on_mqtt_status(True)
+
+    def _on_disconnect(self, client, userdata, flags, rc, properties=None) -> None:
+        logger.info(f"MQTT disconnected rc={rc}")
+        if self._on_mqtt_status:
+            self._on_mqtt_status(False)
 
     def _on_message(self, client, userdata, msg) -> None:
         node_filter = self._cfg.node_id
@@ -158,7 +169,7 @@ class MeshtasticSource:
             course=float(p.ground_track) if p.ground_track else 0.0,
             fix=True,
             sats=p.sats_in_view,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
         logger.info(f"Position: lat={pos.lat:.5f} lon={pos.lon:.5f} alt={pos.alt}m sats={pos.sats}")
         self._on_position(pos)
@@ -213,7 +224,8 @@ class MeshtasticSource:
             raw = cipher.decryptor().update(bytes(packet.encrypted))
             data = Data()
             data.ParseFromString(raw)
-            return data
         except Exception as e:
             logger.debug(f"Decrypt failed pid={packet.id:#010x} channel key: {e}")
             return None
+        else:
+            return data

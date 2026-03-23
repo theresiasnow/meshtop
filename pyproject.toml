@@ -1,10 +1,11 @@
 [project]
 name = "lorabridge"
 version = "0.1.0"
-description = "GPS bridge for Seeed Wio Tracker — forwards to pi-star, APRS-IS, gpsd, rigtop"
+description = "GPS bridge for Meshtastic devices — forwards to pi-star, APRS-IS, gpsd, rigtop"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bleak>=0.21",
     "cryptography>=46.0.5",
     "loguru>=0.7",
     "meshtastic>=2.7.8",
@@ -13,6 +14,7 @@ dependencies = [
     "pynmea2>=1.19",
     "pyserial>=3.5",
     "rich>=13.0",
+    "textual>=0.80.0",
     "typer>=0.24.1",
 ]
 
