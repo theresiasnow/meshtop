@@ -5,12 +5,20 @@ import tomllib
 from pydantic import BaseModel
 
 
+class ChannelConfig(BaseModel):
+    enabled: bool = True
+    encrypted: bool = False    # True = decrypt with key below
+    key: str = ""              # base64 PSK (required if encrypted=true)
+
+
 class LoraSourceConfig(BaseModel):
-    broker: str = "eu1.cloud.thethings.network"
+    broker: str = "mqtt.meshtastic.org"
     port: int = 1883
-    username: str = ""
-    password: str = ""
-    topic: str = "v3/+/devices/+/up"
+    username: str = "meshdev"
+    password: str = "large4cats"
+    topic: str = "msh/EU_868/SE/#"
+    node_id: str = ""                        # e.g. "!7a78e5e3" — filter to own node only
+    channels: dict[str, ChannelConfig] = {}  # channel name -> config
 
 
 class SourceConfig(BaseModel):

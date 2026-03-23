@@ -4,11 +4,21 @@ port = "COM3"            # or "/dev/ttyUSB0"
 baud = 9600
 
 [source.lora]
-broker   = "eu1.cloud.thethings.network"
+broker   = "mqtt.meshtastic.org"
 port     = 1883
-username = "my-app@ttn"
-password = "NNSXS.xxx"
-topic    = "v3/+/devices/+/up"
+username = "meshdev"
+password = "large4cats"
+topic    = "msh/EU_868/SE/#"
+node_id  = "!7a78e5e3"     # filter to own node only
+
+[source.lora.channels.LongFast]
+enabled   = true
+encrypted = false
+
+[source.lora.channels.TSS]
+enabled   = true
+encrypted = true
+key       = "base64-psk-here"
 
 [nmea_server]
 enabled = true

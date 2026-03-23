@@ -10,4 +10,5 @@ class Position:
     speed: float = 0.0       # knots
     course: float = 0.0      # degrees true
     fix: bool = False
+    sats: int = 0
     timestamp: datetime = field(default_factory=datetime.utcnow)

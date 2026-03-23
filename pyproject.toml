@@ -5,12 +5,15 @@ description = "GPS bridge for Seeed Wio Tracker — forwards to pi-star, APRS-IS
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cryptography>=46.0.5",
     "loguru>=0.7",
+    "meshtastic>=2.7.8",
     "paho-mqtt>=2.0",
     "pydantic>=2.0",
     "pynmea2>=1.19",
     "pyserial>=3.5",
     "rich>=13.0",
+    "typer>=0.24.1",
 ]
 
 [dependency-groups]
@@ -26,7 +29,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-lorabridge = "lorabridge.cli:main"
+lorabridge = "lorabridge.cli:app"
 
 [tool.ruff]
 target-version = "py312"

@@ -1,3 +1,3 @@
-from lorabridge.cli import main
+from lorabridge.cli import app
 
-main()
+app()
