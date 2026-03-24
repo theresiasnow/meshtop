@@ -155,9 +155,9 @@ def main(
             rigtop_sink.send(pos)
 
     if tui:
-        from meshtop.tui import LorabridgeApp
+        from meshtop.tui import MeshtopApp
 
-        tui_app = LorabridgeApp(
+        tui_app = MeshtopApp(
             cfg,
             aprs=aprs_sink,
             nmea=nmea_server,
@@ -216,7 +216,10 @@ def main(
             try:
                 new_src.start()
             except Exception as exc:
-                src_ref[0] = new_src
+                try:
+                    new_src.stop()
+                except Exception:
+                    pass
                 return _friendly_error(exc)
             src_ref[0] = new_src
             _drain(new_src)
@@ -231,6 +234,23 @@ def main(
 
         tui_app._on_connect = on_connect  # type: ignore[attr-defined]
         tui_app._on_disconnect = on_disconnect  # type: ignore[attr-defined]
+
+        # MQTT node observer — runs always in the background to collect node info
+        # from the broader mesh, regardless of whether primary source is BLE/serial/lora.
+        # Uses lora config but clears node_id filter so it sees all nodes, not just ours.
+        mqtt_obs: list = [None]
+
+        def _start_mqtt_observer() -> None:
+            from meshtop.sources.meshtastic import MeshtasticSource
+            obs_cfg = cfg.source.lora.model_copy(update={"node_id": ""})
+            obs = MeshtasticSource(obs_cfg, on_nodeinfo=on_nodeinfo)
+            try:
+                obs.start()
+                mqtt_obs[0] = obs
+            except Exception as exc:
+                logger.warning(f"MQTT node observer failed: {exc}")
+
+        threading.Thread(target=_start_mqtt_observer, daemon=True, name="mqtt-obs").start()
 
         if cfg.source.type != "none":
             src_ref[0] = _build_source(
@@ -277,6 +297,11 @@ def main(
             tui_app.run()
         finally:
             threading.excepthook = _orig_hook
+            if mqtt_obs[0]:
+                try:
+                    mqtt_obs[0].stop()
+                except Exception:
+                    pass
             if src_ref[0]:
                 try:
                     src_ref[0].stop()

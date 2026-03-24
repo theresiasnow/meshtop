@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Callable
 
 from loguru import logger
 
 from meshtop.config import SourceConfig
 from meshtop.sources._mesh_decode import decode_packet
+
+_WATCHDOG_TIMEOUT = 180  # seconds of silence before forcing reconnect
 
 
 class BleSource:
@@ -30,6 +34,9 @@ class BleSource:
         self._receive_sub = None
         self._connect_sub = None
         self._disconnect_sub = None
+        self._last_rx = 0.0
+        self._watchdog_thread: threading.Thread | None = None
+        self._watchdog_stop = threading.Event()
 
     def start(self) -> None:
         from meshtastic.ble_interface import BLEClient, BLEInterface
@@ -55,6 +62,7 @@ class BleSource:
                 return client
 
         def on_receive(packet, interface) -> None:
+            self._last_rx = time.monotonic()
             decode_packet(
                 packet,
                 on_position=self._on_position,
@@ -65,6 +73,7 @@ class BleSource:
             )
 
         def on_connect(interface, topic=pub.AUTO_TOPIC) -> None:
+            self._last_rx = time.monotonic()
             name = device or "auto"
             logger.info(f"Meshtastic BLE connected: {name}")
             if self._on_status:
@@ -85,9 +94,32 @@ class BleSource:
 
         logger.info(f"BleSource connecting to {device or 'first available device'}…")
         self._iface = _PairableBLEInterface(device)
+        self._last_rx = time.monotonic()
         logger.info("BleSource started")
 
+        self._watchdog_stop.clear()
+        self._watchdog_thread = threading.Thread(
+            target=self._watchdog, daemon=True, name="ble-watchdog"
+        )
+        self._watchdog_thread.start()
+
+    def _watchdog(self) -> None:
+        while not self._watchdog_stop.wait(timeout=30):
+            if not self._iface:
+                break
+            age = time.monotonic() - self._last_rx
+            if age >= _WATCHDOG_TIMEOUT:
+                logger.warning(
+                    f"BLE watchdog: no packets for {age:.0f}s — forcing disconnect"
+                )
+                try:
+                    self._iface.close()
+                except Exception:
+                    pass
+                break
+
     def stop(self) -> None:
+        self._watchdog_stop.set()
         try:
             from pubsub import pub
             if self._receive_sub:
@@ -99,7 +131,6 @@ class BleSource:
         except Exception:
             pass
         if self._iface:
-            import threading
             iface, self._iface = self._iface, None
             t = threading.Thread(target=iface.close, daemon=True)
             t.start()

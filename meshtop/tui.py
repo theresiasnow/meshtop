@@ -372,6 +372,57 @@ class SerialPickerScreen(ModalScreen):
         self.dismiss(self._ports[idx].device)
 
 
+# ── Log viewer ────────────────────────────────────────────────────────────────
+
+
+class LogScreen(ModalScreen):
+    """Modal that shows the tail of meshtop.log."""
+
+    CSS = """
+    LogScreen { align: center middle; }
+    #log-dialog {
+        width: 90%;
+        height: 90%;
+        border: thick $accent;
+        background: $surface;
+        padding: 1 2;
+    }
+    #log-title { text-align: center; text-style: bold; color: $accent; margin-bottom: 1; }
+    #log-view  { height: 1fr; border: round $primary; }
+    #log-hint  { text-align: center; color: $text-disabled; margin-top: 1; }
+    """
+
+    BINDINGS: ClassVar[list] = [
+        Binding("escape", "dismiss(None)", "Close"),
+        Binding("r", "refresh_log", "Refresh"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="log-dialog"):
+            yield Label("meshtop.log", id="log-title")
+            yield RichLog(id="log-view", highlight=False, markup=False)
+            yield Label("Esc close   r refresh", id="log-hint")
+
+    def on_mount(self) -> None:
+        self._load()
+
+    def _load(self) -> None:
+        from pathlib import Path
+        view = self.query_one("#log-view", RichLog)
+        view.clear()
+        log_path = Path("meshtop.log")
+        if not log_path.exists():
+            view.write("(meshtop.log not found)")
+            return
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()[-300:]
+        for line in lines:
+            view.write(line)
+        view.scroll_end(animate=False)
+
+    def action_refresh_log(self) -> None:
+        self._load()
+
+
 # ── Command completion ────────────────────────────────────────────────────────
 
 
@@ -384,6 +435,7 @@ class CommandSuggester(Suggester):
         "serial": ["on", "off"],
         "pos": [],
         "node": [],
+        "log": [],
         "help": [],
         "q": [],
         "quit": [],
@@ -417,7 +469,7 @@ class CommandSuggester(Suggester):
 # ── Main app ──────────────────────────────────────────────────────────────────
 
 
-class LorabridgeApp(App[None]):
+class MeshtopApp(App[None]):
     CSS = """
     Screen { layout: vertical; overflow: hidden hidden; }
     #top-row { height: 12; }
@@ -582,22 +634,22 @@ class LorabridgeApp(App[None]):
     # ── Thread-safe callbacks (post non-blocking messages to the event loop) ──
 
     def on_position(self, pos: Position) -> None:
-        self.post_message(LorabridgeApp.PositionReceived(pos))
+        self.post_message(MeshtopApp.PositionReceived(pos))
 
     def on_telemetry(self, m: DeviceMetrics) -> None:
-        self.post_message(LorabridgeApp.TelemetryReceived(m))
+        self.post_message(MeshtopApp.TelemetryReceived(m))
 
     def on_nodeinfo(self, n: NodeInfo) -> None:
-        self.post_message(LorabridgeApp.NodeInfoReceived(n))
+        self.post_message(MeshtopApp.NodeInfoReceived(n))
 
     def on_text(self, m: TextMessage) -> None:
-        self.post_message(LorabridgeApp.TextReceived(m))
+        self.post_message(MeshtopApp.TextReceived(m))
 
     def on_mqtt_status(self, connected: bool) -> None:
-        self.post_message(LorabridgeApp.SourceStatus(connected))
+        self.post_message(MeshtopApp.SourceStatus(connected))
 
     def on_beacon_sent(self) -> None:
-        self.post_message(LorabridgeApp.BeaconSent())
+        self.post_message(MeshtopApp.BeaconSent())
 
     # ── Message handlers (run on the event loop) ──────────────────────────────
 
@@ -688,6 +740,7 @@ class LorabridgeApp(App[None]):
             "serial": self._cmd_serial,
             "pos": lambda _: self._cmd_pos(),
             "node": lambda _: self._cmd_node(),
+            "log": lambda _: self._cmd_log(),
             "help": lambda _: self._cmd_help(),
             "q": lambda _: self.exit(),
             "quit": lambda _: self.exit(),
@@ -783,7 +836,7 @@ class LorabridgeApp(App[None]):
             if self._on_connect is None:
                 self.notify(f"Device address: {addr}", title="BLE")
                 return
-            self.notify(f"Connecting to {addr}…", title="BLE", timeout=15)
+            self.notify(f"Connecting to {addr}…", title="BLE", timeout=60)
 
             def _do() -> None:
                 err = self._on_connect("ble", addr)
@@ -835,6 +888,9 @@ class LorabridgeApp(App[None]):
 
         self.push_screen(SerialPickerScreen(), _on_pick)
 
+    def _cmd_log(self) -> None:
+        self.push_screen(LogScreen())
+
     def _cmd_help(self) -> None:
         cmds = (
             "ble on  —  scan and connect via Bluetooth",
@@ -846,6 +902,7 @@ class LorabridgeApp(App[None]):
             "beacon on|off  —  toggle APRS beaconing",
             "pos  —  show current position",
             "node  —  list heard nodes",
+            "log  —  view log file",
             "help  —  this message",
             "q / quit  —  exit",
         )
