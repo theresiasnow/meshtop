@@ -12,3 +12,4 @@ meshtop.toml
 *.bin
 test_*.py
 .claude/
+err.txt
