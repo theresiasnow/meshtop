@@ -5,28 +5,29 @@
 ## Type of change
 
 - [ ] Bug fix
-- [ ] New feature / sink or source
+- [ ] New feature / sink
 - [ ] Refactor (no behaviour change)
 - [ ] Docs / config
 - [ ] CI / tooling
 
 ## Testing
 
-<!-- How was this tested? Serial port, MQTT, TUI smoke, --help, etc. -->
+<!-- How was this tested? Serial connection, LoRa gateway, APRS-IS, gpsd, etc. -->
 
 - [ ] Imported cleanly (`uv run meshtop --help`)
-- [ ] Tested against a live device / MQTT broker
+- [ ] Tested against a live GPS source (serial or LoRa)
+- [ ] Tested relevant sinks (NMEA server, APRS-IS, gpsd, rigtop)
 - [ ] Ruff passes (`ruff check meshtop/ && ruff format --check meshtop/`)
 
-## Device / radio notes
+## Ham radio notes
 
-<!-- Device model, firmware version, operating mode tested — helps reviewers replicate. -->
+<!-- Callsign, GPS source, operating mode tested — helps reviewers replicate. -->
 <!-- Leave blank if not applicable. -->
 
 ## Checklist
 
 - [ ] New config fields have pydantic validators
-- [ ] New sinks inherit `PositionSink` / new sources produce `Position` objects
+- [ ] New sinks run as background threads and implement the sink callback interface
 - [ ] Socket/serial errors handled with `OSError` / `ConnectionError`
 - [ ] `loguru` used for logging (no bare `print` for debug output)
-- [ ] Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
+- [ ] `position.py` is the only shared data contract between sources and sinks

@@ -5,14 +5,14 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug. Please fill in as much detail as you can — device model and operating conditions are especially helpful.
+        Thanks for taking the time to report a bug. Please fill in as much detail as you can — GPS source and operating conditions are especially helpful.
 
   - type: textarea
     id: description
     attributes:
       label: Description
       description: A clear and concise summary of the bug.
-      placeholder: "e.g. meshtop crashes when receiving a position packet from a Meshtastic node"
+      placeholder: "e.g. meshtop crashes when switching from serial to LoRa source"
     validations:
       required: true
 
@@ -22,9 +22,10 @@ body:
       label: Steps to reproduce
       description: List the exact steps needed to trigger the bug.
       placeholder: |
-        1. Start meshtop with `uv run meshtop --source serial --port /dev/ttyUSB0`
-        2. Send a position packet from a Meshtastic node
-        3. Observe crash / incorrect behaviour
+        1. Start meshtop with `uv run meshtop`
+        2. Connect to serial source on COM3
+        3. Switch to LoRa source
+        4. Observe crash / incorrect behaviour
     validations:
       required: true
 
@@ -40,7 +41,7 @@ body:
     id: actual
     attributes:
       label: Actual behaviour
-      description: What actually happened? Include any error messages shown in the TUI or terminal.
+      description: What actually happened? Include any error messages shown in the terminal.
     validations:
       required: true
 
@@ -72,11 +73,11 @@ body:
       required: true
 
   - type: input
-    id: device_model
+    id: gps_source
     attributes:
-      label: Device model
-      description: The Meshtastic device or GPS source you are using.
-      placeholder: "e.g. Seeed Wio Tracker 1110, RAK4631, Heltec v3"
+      label: GPS source
+      description: The GPS source you are using (serial / LoRa, device model if known).
+      placeholder: "e.g. Seeed Wio Tracker 1110 via serial, TTN LoRa gateway"
     validations:
       required: false
 
@@ -85,7 +86,7 @@ body:
     attributes:
       label: meshtop version (git hash)
       description: Output of `git rev-parse --short HEAD` in the meshtop directory.
-      placeholder: "e.g. a0f3242"
+      placeholder: "e.g. 76b572a"
     validations:
       required: true
 
@@ -98,7 +99,7 @@ body:
         Wrap in a code block or use the monospace button above.
       render: text
       placeholder: |
-        2026-03-24 10:03:22 | ERROR | meshtop.sources.serial | Connection refused: /dev/ttyUSB0
+        2026-03-21 14:03:22 | ERROR | meshtop.sources.serial | Serial port not found: COM3
     validations:
       required: false
 
@@ -107,7 +108,7 @@ body:
     attributes:
       label: Additional context
       description: |
-        Anything else that might be relevant — Meshtastic firmware version, MQTT broker,
-        APRS path, network topology, pi-star version, etc.
+        Anything else that might be relevant — antenna type, MQTT broker details,
+        APRS path, NMEA sink configuration, network topology, pi-star version, etc.
     validations:
       required: false

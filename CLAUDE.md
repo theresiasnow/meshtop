@@ -24,7 +24,7 @@ meshtop/
   position.py      # Position dataclass (lat, lon, alt, speed, course, fix)
   sources/
     __init__.py
-    serial.py      # USB-serial NMEA (Wio Tracker direct, pyserial + pynmea2)
+    serial.py      # USB-serial NMEA (Meshtastic device, pyserial + pynmea2)
     lora.py        # LoRa-gateway via MQTT (TTN v3 / Chirpstack, paho-mqtt)
   sinks/
     __init__.py

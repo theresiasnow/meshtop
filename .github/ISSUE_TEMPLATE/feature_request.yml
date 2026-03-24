@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have an idea that would make meshtop more useful? Describe it below.
+        Have an idea that would make meshtop more useful in the field? Describe it below.
         The more operating context you can share, the easier it is to evaluate.
 
   - type: textarea
@@ -13,7 +13,7 @@ body:
     attributes:
       label: Description
       description: A clear and concise summary of the feature you would like to see.
-      placeholder: "e.g. Add a Winlink gateway sink to forward position packets"
+      placeholder: "e.g. Add a Winlink position report sink"
     validations:
       required: true
 
@@ -22,10 +22,10 @@ body:
     attributes:
       label: Use case / motivation
       description: |
-        Why do you need this? What problem does it solve for you?
+        Why do you need this? What problem does it solve for you in the field or in your shack?
       placeholder: |
-        When running SOTA activations, I want meshtop to forward my GPS position
-        to Winlink so my location is visible on Winlink maps without manual entry.
+        When running portable APRS, I want meshtop to forward positions to Winlink
+        so I can check in on the network without a separate application.
     validations:
       required: true
 
@@ -35,10 +35,10 @@ body:
       label: Proposed solution
       description: |
         How do you imagine this working? Feel free to sketch a config snippet, CLI flag,
-        or TUI interaction — rough ideas are fine.
+        or interaction — rough ideas are fine.
       placeholder: |
         A new sink `[sinks.winlink]` that reads callsign + position from the existing
-        pipeline and submits a position report every 5 minutes.
+        pipeline and sends a check-in message via Winlink every 30 minutes.
     validations:
       required: false
 
@@ -52,15 +52,15 @@ body:
       required: false
 
   - type: textarea
-    id: device_context
+    id: ham_radio_context
     attributes:
-      label: Device / operating context
+      label: Ham radio context
       description: |
-        Relevant device details that help scope the request: Meshtastic device model,
-        source type (serial/LoRa/BLE), typical workflow, etc.
+        Relevant station details that help scope the request: GPS source, operating mode,
+        licence class, typical workflow (portable / fixed / SOTA / emergency comms), etc.
       placeholder: |
-        Device: Seeed Wio Tracker 1110
-        Source: serial (direct USB)
+        Source: Seeed Wio Tracker 1110 via serial
+        Sinks: APRS-IS + pi-star NMEA
         Workflow: SOTA activations where grid square changes every outing
     validations:
       required: false

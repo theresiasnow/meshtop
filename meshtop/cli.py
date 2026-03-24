@@ -16,7 +16,7 @@ from meshtop.sinks.nmea_server import NmeaServer
 from meshtop.sinks.rigtop import RigtopSink
 from meshtop.sources.meshtastic import DeviceMetrics, MeshtasticSource, NodeInfo, TextMessage
 
-app = typer.Typer(help="GPS bridge -- Wio Tracker to pi-star / APRS / gpsd / rigtop")
+app = typer.Typer(help="GPS bridge -- Meshtastic device to pi-star / APRS / gpsd / rigtop")
 console = Console()
 
 
