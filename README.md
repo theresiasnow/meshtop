@@ -42,3 +42,5 @@ uv run meshtop --no-tui --debug       # plain console output with debug logging
 | `pos` | Show current position |
 | `help` | List all commands |
 
+
+<!-- Triggering workflow with this comment -->
