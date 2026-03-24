@@ -176,4 +176,5 @@ def _txt(decoded: dict, packet: dict, from_id: str, cb: Callable) -> None:
     to_int = packet.get("to", 0xFFFFFFFF)
     to_id = "broadcast" if to_int == 0xFFFFFFFF else _nid(to_int)
     text = decoded.get("text", "")
-    cb(TextMessage(from_id=from_id, to_id=to_id, text=text))
+    channel = str(packet.get("channel", 0))
+    cb(TextMessage(from_id=from_id, to_id=to_id, text=text, channel=channel))

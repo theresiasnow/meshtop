@@ -252,9 +252,17 @@ def main(
             cfg.source.type = "none"  # type: ignore[assignment]
             on_status(False)
 
+        def _save_channels() -> None:
+            from meshtop.config import save_config
+            save_config(cfg, config)
+            for src in [src_ref[0], mqtt_obs[0]]:
+                if src is not None and hasattr(src, "reload_channels"):
+                    src.reload_channels()
+
         tui_app._on_connect = on_connect  # type: ignore[attr-defined]
         tui_app._on_disconnect = on_disconnect  # type: ignore[attr-defined]
         tui_app._get_iface = lambda: getattr(src_ref[0], "_iface", None) if src_ref[0] else None  # type: ignore[attr-defined]
+        tui_app._save_channels = _save_channels  # type: ignore[attr-defined]
 
         # MQTT node observer — runs always in the background to collect node info
         # from the broader mesh, regardless of whether primary source is BLE/serial/lora.

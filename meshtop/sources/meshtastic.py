@@ -1,4 +1,3 @@
-import base64
 import struct
 import threading
 from collections.abc import Callable
@@ -15,7 +14,7 @@ from meshtastic.protobuf.mesh_pb2 import Position as MeshPosition
 from meshtastic.protobuf.mqtt_pb2 import ServiceEnvelope
 from meshtastic.protobuf.telemetry_pb2 import Telemetry
 
-from meshtop.config import LoraSourceConfig
+from meshtop.config import LoraSourceConfig, expand_psk
 from meshtop.position import Position
 
 
@@ -76,14 +75,17 @@ class MeshtasticSource:
         self._on_nodeinfo = on_nodeinfo
         self._on_text = on_text
         self._on_mqtt_status = on_mqtt_status
-        # Build channel key lookup: channel_name -> bytes
+        # Primary channel (index 0) key — used as fallback for any unnamed channel
+        pk = expand_psk(cfg.primary_key) if cfg.primary_key else b""
+        self._primary_key: bytes | None = pk or None
+        # Named secondary channel key lookup: channel_name -> bytes
         self._channel_keys: dict[str, bytes] = {}
         self._enabled_channels: set[str] = set()
         for name, ch in cfg.channels.items():
             if ch.enabled:
                 self._enabled_channels.add(name)
             if ch.enabled and ch.encrypted and ch.key:
-                self._channel_keys[name] = base64.b64decode(ch.key)
+                self._channel_keys[name] = expand_psk(ch.key)
         self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self._client.username_pw_set(cfg.username, cfg.password)
         self._client.on_connect = self._on_connect
@@ -104,6 +106,21 @@ class MeshtasticSource:
         if self._thread:
             self._thread.join(timeout=5)
         logger.info("MeshtasticSource stopped")
+
+    def reload_channels(self) -> None:
+        """Rebuild primary key, channel key / enabled-set from current cfg."""
+        pk = expand_psk(self._cfg.primary_key) if self._cfg.primary_key else b""
+        self._primary_key = pk or None
+        new_keys: dict[str, bytes] = {}
+        new_enabled: set[str] = set()
+        for name, ch in self._cfg.channels.items():
+            if ch.enabled:
+                new_enabled.add(name)
+            if ch.enabled and ch.encrypted and ch.key:
+                new_keys[name] = expand_psk(ch.key)
+        self._channel_keys = new_keys
+        self._enabled_channels = new_enabled
+        logger.info(f"Primary key set: {bool(self._primary_key)}  named channels: {list(new_keys)}")
 
     # ----------------------------------------------------------------- private
 
@@ -140,8 +157,8 @@ class MeshtasticSource:
             # Accept all decoded packets regardless of channel
             data = packet.decoded
         elif packet.HasField("encrypted"):
-            # Only decrypt if we have a key for this channel
-            key = self._channel_keys.get(channel_name)
+            # Named secondary channel key first; fall back to primary channel key
+            key = self._channel_keys.get(channel_name) or self._primary_key
             if key:
                 data = self._decrypt(packet, key)
 
@@ -157,7 +174,7 @@ class MeshtasticSource:
             elif pn == portnums_pb2.NODEINFO_APP:
                 self._handle_nodeinfo(data.payload, packet)
             elif pn == portnums_pb2.TEXT_MESSAGE_APP:
-                self._handle_text(data.payload, packet)
+                self._handle_text(data.payload, packet, channel_name)
         except Exception as e:
             logger.debug(f"Failed to decode portnum={pn}: {e}")
 
@@ -211,14 +228,14 @@ class MeshtasticSource:
         logger.debug(f"NodeInfo: {node.long_name} ({node.short_name})")
         self._on_nodeinfo(node)
 
-    def _handle_text(self, payload: bytes, packet: MeshPacket) -> None:
+    def _handle_text(self, payload: bytes, packet: MeshPacket, channel: str = "") -> None:
         if not self._on_text:
             return
         from_id = f"!{getattr(packet, 'from'):08x}"
         to_id = f"!{packet.to:08x}" if packet.to != 0xFFFFFFFF else "broadcast"
         text = payload.decode("utf-8", errors="replace")
-        msg = TextMessage(from_id=from_id, to_id=to_id, text=text)
-        logger.info(f"Text [{from_id} -> {to_id}]: {text}")
+        msg = TextMessage(from_id=from_id, to_id=to_id, text=text, channel=channel)
+        logger.info(f"Text [{from_id} -> {to_id}] ch={channel!r}: {text}")
         self._on_text(msg)
 
     def _decrypt(self, packet: MeshPacket, key: bytes):

@@ -418,55 +418,6 @@ wheels = [
 ]
 
 [[package]]
-name = "meshtop"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "bleak" },
-    { name = "cryptography" },
-    { name = "loguru" },
-    { name = "meshtastic" },
-    { name = "paho-mqtt" },
-    { name = "pydantic" },
-    { name = "pynmea2" },
-    { name = "pyserial" },
-    { name = "rich" },
-    { name = "textual" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "commitizen" },
-    { name = "pylint" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "bleak", specifier = ">=0.21" },
-    { name = "cryptography", specifier = ">=46.0.5" },
-    { name = "loguru", specifier = ">=0.7" },
-    { name = "meshtastic", specifier = ">=2.7.8" },
-    { name = "paho-mqtt", specifier = ">=2.0" },
-    { name = "pydantic", specifier = ">=2.0" },
-    { name = "pynmea2", specifier = ">=1.19" },
-    { name = "pyserial", specifier = ">=3.5" },
-    { name = "rich", specifier = ">=13.0" },
-    { name = "textual", specifier = ">=0.80.0" },
-    { name = "typer", specifier = ">=0.24.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "commitizen", specifier = ">=4.0" },
-    { name = "pylint", specifier = ">=3.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "ruff", specifier = ">=0.15" },
-]
-
-[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -593,6 +544,57 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/68/0b/1eae93ceba68c63c8246f475748241d3bbf8e05af4e680a3a04b2a3ed20c/meshtastic-2.7.8.tar.gz", hash = "sha256:98292e43884e239429056b8a0b31291e169a0b7ededae2c7caa737a8cc9f1a97", size = 295836, upload-time = "2026-03-02T17:30:36.166Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/9f/769cdeb3d0cd3f1e10a3b06d0a003c18a8a51e83084d9e24b788f5ff8e27/meshtastic-2.7.8-py3-none-any.whl", hash = "sha256:ab8fe0582acd114b31c4ef9aa1cfcd76f7867f7971d94d846971aa5eee61218a", size = 345375, upload-time = "2026-03-02T17:30:34.746Z" },
+]
+
+[[package]]
+name = "meshtop"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "bleak" },
+    { name = "cryptography" },
+    { name = "loguru" },
+    { name = "meshtastic" },
+    { name = "paho-mqtt" },
+    { name = "pydantic" },
+    { name = "pynmea2" },
+    { name = "pyserial" },
+    { name = "rich" },
+    { name = "textual" },
+    { name = "tomli-w" },
+    { name = "typer" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "commitizen" },
+    { name = "pylint" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bleak", specifier = ">=0.21" },
+    { name = "cryptography", specifier = ">=46.0.5" },
+    { name = "loguru", specifier = ">=0.7" },
+    { name = "meshtastic", specifier = ">=2.7.8" },
+    { name = "paho-mqtt", specifier = ">=2.0" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pynmea2", specifier = ">=1.19" },
+    { name = "pyserial", specifier = ">=3.5" },
+    { name = "rich", specifier = ">=13.0" },
+    { name = "textual", specifier = ">=0.80.0" },
+    { name = "tomli-w", specifier = ">=1.0" },
+    { name = "typer", specifier = ">=0.24.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "commitizen", specifier = ">=4.0" },
+    { name = "pylint", specifier = ">=3.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "ruff", specifier = ">=0.15" },
 ]
 
 [[package]]
@@ -1039,6 +1041,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/72/23/8c709655c5f2208ee82ab81b8104802421865535c278a7649b842b129db1/textual-8.1.1.tar.gz", hash = "sha256:eef0256a6131f06a20ad7576412138c1f30f92ddeedd055953c08d97044bc317", size = 1843002, upload-time = "2026-03-10T10:01:38.493Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/50/21/421b02bf5943172b7a9320712a5e0d74a02a8f7597284e3f8b5b06c70b8d/textual-8.1.1-py3-none-any.whl", hash = "sha256:6712f96e335cd782e76193dee16b9c8875fe0699d923bc8d3f1228fd23e773a6", size = 719598, upload-time = "2026-03-10T10:01:48.318Z" },
+]
+
+[[package]]
+name = "tomli-w"
+version = "1.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/75/241269d1da26b624c0d5e110e8149093c759b7a286138f4efd61a60e75fe/tomli_w-1.2.0.tar.gz", hash = "sha256:2dd14fac5a47c27be9cd4c976af5a12d87fb1f0b4512f81d69cce3b35ae25021", size = 7184, upload-time = "2025-01-15T12:07:24.262Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/18/c86eb8e0202e32dd3df50d43d7ff9854f8e0603945ff398974c1d91ac1ef/tomli_w-1.2.0-py3-none-any.whl", hash = "sha256:188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90", size = 6675, upload-time = "2025-01-15T12:07:22.074Z" },
 ]
 
 [[package]]

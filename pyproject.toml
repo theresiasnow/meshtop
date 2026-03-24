@@ -15,6 +15,7 @@ dependencies = [
     "pyserial>=3.5",
     "rich>=13.0",
     "textual>=0.80.0",
+    "tomli-w>=1.0",
     "typer>=0.24.1",
 ]
 

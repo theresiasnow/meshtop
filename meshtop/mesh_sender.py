@@ -32,13 +32,14 @@ def send_text(
     dest: str,
     text: str,
     iface: Any = None,
+    channel_index: int = 0,
 ) -> str:
     """Send a Meshtastic text message. Returns a status string."""
     if iface is not None:
-        iface.sendText(text, destinationId=dest)
+        iface.sendText(text, destinationId=dest, channelIndex=channel_index)
         return f"Sent to {dest}"
     with _fallback_iface(cfg, serial_port) as i:
-        i.sendText(text, destinationId=dest)
+        i.sendText(text, destinationId=dest, channelIndex=channel_index)
     return f"Sent to {dest} via {'TCP' if cfg.device_host else 'serial'}"
 
 

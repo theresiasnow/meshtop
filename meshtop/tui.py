@@ -10,14 +10,25 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.suggester import Suggester
-from textual.widgets import Header, Input, Label, ListItem, ListView, RichLog, Static
+from textual.widgets import (
+    Checkbox,
+    Header,
+    Input,
+    Label,
+    ListItem,
+    ListView,
+    RichLog,
+    Static,
+)
 
+from meshtop.config import ChannelConfig
 from meshtop.position import Position
 from meshtop.sources.meshtastic import DeviceMetrics, NodeInfo, TextMessage, TraceRoute
 
@@ -161,9 +172,9 @@ class NodesPanel(Static):
             txt.append(" (none yet)", style="dim")
         else:
             for nid, n in list(nodes.items())[-6:]:  # show latest 6
-                txt.append(f" {n.long_name:<12}", style="bold cyan")
-                txt.append(f"  {n.short_name:<6}", style="cyan")
-                txt.append(f"  {nid}\n", style="dim")
+                txt.append(f" {n.short_name:<6}", style="bold cyan")
+                txt.append(f"  {nid}  ", style="dim")
+                txt.append(f"{n.long_name}\n", style="cyan")
         self.update(txt)
 
 
@@ -423,13 +434,145 @@ class LogScreen(ModalScreen):
         self._load()
 
 
+# ── Channel config screen ─────────────────────────────────────────────────────
+
+
+class ChannelConfigScreen(ModalScreen):
+    """Modal for viewing and editing per-channel MQTT encryption settings."""
+
+    CSS = """
+    ChannelConfigScreen { align: center middle; }
+    #ch-dialog {
+        width: 74; height: auto; max-height: 85%;
+        border: round $accent; background: $surface; padding: 1 2;
+    }
+    #ch-title  { text-align: center; padding-bottom: 1; }
+    .ch-head   { height: 1; }
+    .ch-head Label { color: $text-muted; }
+    .ch-col-name  { width: 16; }
+    .ch-col-en    { width: 10; }
+    .ch-col-enc   { width: 12; }
+    .ch-col-key   { width: 1fr; }
+    .ch-row       { height: 3; }
+    .ch-name      { width: 16; content-align: left middle; padding: 0 1; }
+    #ch-empty  { color: $text-muted; padding: 1 0; }
+    #ch-hint   { text-align: center; padding-top: 1; color: $text-muted; }
+    """
+
+    BINDINGS: ClassVar[list] = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("ctrl+s", "save", "Save"),
+    ]
+
+    def __init__(self, channels: dict[str, ChannelConfig]) -> None:
+        super().__init__()
+        self._channels: dict[str, ChannelConfig] = {
+            n: ch.model_copy() for n, ch in channels.items()
+        }
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="ch-dialog"):
+            yield Label("Channel Encryption Settings", id="ch-title")
+            with Horizontal(classes="ch-head"):
+                yield Label("Channel", classes="ch-col-name")
+                yield Label("Enabled", classes="ch-col-en")
+                yield Label("Encrypted", classes="ch-col-enc")
+                yield Label("PSK Key (base64)", classes="ch-col-key")
+            if not self._channels:
+                yield Label(
+                    "No channels configured — add [source.lora.channels.NAME] to meshtop.toml",
+                    id="ch-empty",
+                )
+            else:
+                for name, ch in self._channels.items():
+                    with Horizontal(classes="ch-row"):
+                        yield Label(name, classes="ch-name")
+                        yield Checkbox("", value=ch.enabled, id=f"en-{name}",
+                                       classes="ch-col-en")
+                        yield Checkbox("", value=ch.encrypted, id=f"enc-{name}",
+                                       classes="ch-col-enc")
+                        yield Input(
+                            value=ch.key, id=f"key-{name}", classes="ch-col-key",
+                            placeholder="base64 PSK",
+                        )
+            yield Label("Ctrl+S save  •  Esc cancel", id="ch-hint")
+
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        cid = event.checkbox.id or ""
+        if cid.startswith("en-"):
+            name = cid[3:]
+            if name in self._channels:
+                self._channels[name].enabled = event.value
+        elif cid.startswith("enc-"):
+            name = cid[4:]
+            if name in self._channels:
+                self._channels[name].encrypted = event.value
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        cid = event.input.id or ""
+        if cid.startswith("key-"):
+            name = cid[4:]
+            if name in self._channels:
+                self._channels[name].key = event.value.strip()
+
+    def action_save(self) -> None:
+        self.dismiss(self._channels)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+# ── History-aware input ───────────────────────────────────────────────────────
+
+
+class HistoryInput(Input):
+    """Input widget with zsh-style up/down arrow command history."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._history: list[str] = []
+        self._history_pos: int = -1   # -1 = not browsing
+        self._history_draft: str = "" # saved current draft while browsing
+
+    def push_history(self, entry: str) -> None:
+        """Add a command to history (deduplicates consecutive identical entries)."""
+        if entry and (not self._history or self._history[-1] != entry):
+            self._history.append(entry)
+        self._history_pos = -1
+        self._history_draft = ""
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.key == "up":
+            if not self._history:
+                return
+            event.prevent_default()
+            if self._history_pos == -1:
+                self._history_draft = self.value
+                self._history_pos = len(self._history) - 1
+            elif self._history_pos > 0:
+                self._history_pos -= 1
+            self.value = self._history[self._history_pos]
+            self.cursor_position = len(self.value)
+        elif event.key == "down":
+            if self._history_pos == -1:
+                return
+            event.prevent_default()
+            if self._history_pos < len(self._history) - 1:
+                self._history_pos += 1
+                self.value = self._history[self._history_pos]
+            else:
+                self._history_pos = -1
+                self.value = self._history_draft
+            self.cursor_position = len(self.value)
+
+
 # ── Command completion ────────────────────────────────────────────────────────
 
 
 class CommandSuggester(Suggester):
     _COMMANDS: ClassVar[dict[str, list[str]]] = {
-        "msg": ["<NODE_ID|^all> <text>"],
-        "send": ["<NODE_ID|^all> <text>"],
+        "msg": ["[#<ch>] <NODE_ID|^all> <text>"],
+        "send": ["[#<ch>] <NODE_ID|^all> <text>"],
         "beacon": ["on", "off"],
         "ble": ["on", "off"],
         "serial": ["on", "off"],
@@ -437,11 +580,13 @@ class CommandSuggester(Suggester):
         "pos": ["send <NODE_ID>"],
         "info": ["<NODE_ID>"],
         "trace": ["<NODE_ID>"],
+        "channel": [],
         "node": [],
         "log": [],
         "help": [],
         "q": [],
         "quit": [],
+        "!": ["<text>  (send to last msg node)"],
     }
 
     def __init__(self) -> None:
@@ -480,7 +625,7 @@ class MeshtopApp(App[None]):
     TelemetryPanel { width: 2fr; }
     NodePanel { width: 1fr; }
     #event-log { height: 1fr; border: round $surface; }
-    #msg-log   { height: 5;   border: round yellow; }
+    #msg-log   { height: 12;  border: round yellow; }
     #cmd-bar {
         height: 3;
         border: tall $accent;
@@ -568,6 +713,8 @@ class MeshtopApp(App[None]):
         self._on_connect: Callable[[str, str], str | None] | None = None
         self._on_disconnect: Callable[[], None] | None = None
         self._get_iface: Callable | None = None  # returns live BLE/serial iface or None
+        self._save_channels: Callable | None = None  # saves channel cfg and reloads sources
+        self._last_msg_dest: str = ""  # last resolved msg destination for ! shortcut
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -581,8 +728,8 @@ class MeshtopApp(App[None]):
         yield RichLog(id="msg-log", highlight=True, markup=True)
         with Horizontal(id="cmd-bar"):
             yield Label("❯ ", id="cmd-prompt")
-            yield Input(
-                placeholder="ble on/off  •  serial on/off  •  beacon on/off  •  msg <NODE> <text>",
+            yield HistoryInput(
+                placeholder="ble  •  serial  •  wifi <HOST>  •  channel  •  msg <NODE> <text>",
                 id="cmd-input",
                 suggester=CommandSuggester(),
             )
@@ -603,7 +750,7 @@ class MeshtopApp(App[None]):
         self.query_one("#node-panel").tooltip = "Local node identity"
         self.query_one("#sinks-panel").tooltip = "Active output sinks (APRS, NMEA, gpsd, rigtop)"
         self.query_one("#nodes-panel").tooltip = "Mesh nodes heard via BLE/serial/MQTT"
-        cmd = self.query_one("#cmd-input", Input)
+        cmd = self.query_one("#cmd-input", HistoryInput)
         cmd.tooltip = (
             "Commands: ble on/off · serial on/off · beacon on/off · "
             "msg <NODE> <text> · pos send <NODE> · info <NODE> · "
@@ -614,16 +761,19 @@ class MeshtopApp(App[None]):
         self.call_after_refresh(cmd.focus)
 
     def action_clear_input(self) -> None:
-        inp = self.query_one("#cmd-input", Input)
+        inp = self.query_one("#cmd-input", HistoryInput)
         inp.value = ""
 
     def action_show_help(self) -> None:
         self._cmd_help()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        if event.input.id != "cmd-input":
+            return
         raw = event.value.strip()
         event.input.value = ""
         if raw:
+            self.query_one("#cmd-input", HistoryInput).push_history(raw)
             self.execute_command(raw)
 
     # ── Periodic refresh ──────────────────────────────────────────────────────
@@ -739,11 +889,10 @@ class MeshtopApp(App[None]):
 
     def _handle_text(self, m: TextMessage) -> None:
         ts = datetime.now(UTC).strftime("%H:%M:%S")
+        ch = f" [dim]{m.channel}[/]" if m.channel else ""
         self.query_one("#msg-log", RichLog).write(
-            f"[dim]{ts}[/]  [magenta]{m.from_id}[/] [dim]->[/] [cyan]{m.to_id}[/]\n  {m.text}"
-        )
-        self.query_one("#event-log", RichLog).write(
-            f"[dim]{ts}[/]  [magenta]TXT[/]  {m.from_id}: {m.text[:60]}"
+            f"[dim]{ts}[/]  [magenta]RX[/]{ch}"
+            f"  [cyan]{m.from_id}[/] [dim]→[/] {m.to_id}\n  {m.text}"
         )
 
     def _update_subtitle(self) -> None:
@@ -763,6 +912,19 @@ class MeshtopApp(App[None]):
     # ── Command execution ─────────────────────────────────────────────────────
 
     def execute_command(self, raw: str) -> None:
+        # "! <text>" → send <text> to last msg recipient
+        # (but "!nodeid ..." is NOT this shortcut — it goes through normal dispatch)
+        if raw.startswith("! "):
+            text = raw[2:].strip()
+            if not self._last_msg_dest:
+                self.notify("No previous msg recipient — use msg <NODE> <text> first",
+                            severity="warning")
+                return
+            if not text:
+                self.notify("Usage: ! <text>", severity="warning")
+                return
+            self._cmd_msg([self._last_msg_dest, *text.split()])
+            return
         parts = raw.strip().split()
         if not parts:
             return
@@ -777,6 +939,7 @@ class MeshtopApp(App[None]):
             "pos": self._cmd_pos,
             "info": self._cmd_info,
             "trace": self._cmd_trace,
+            "channel": self._cmd_channel,
             "node": lambda _: self._cmd_node(),
             "log": lambda _: self._cmd_log(),
             "help": lambda _: self._cmd_help(),
@@ -789,31 +952,80 @@ class MeshtopApp(App[None]):
         else:
             self.notify(f"Unknown command: {cmd}  (type help)", severity="warning")
 
+    def _resolve_node(self, dest: str) -> str:
+        """Normalise a node identifier to a full !XXXXXXXX ID.
+
+        Accepts:
+          ^all          — broadcast, returned as-is
+          !7a78e5e3     — full ID
+          7a78e5e3      — bare hex, prefixed with !
+          e5e3 / 1244   — hex suffix matched against the end of known node IDs
+          TSSV          — Meshtastic short name (4-char, case-insensitive)
+        """
+        if dest == "^all":
+            return dest
+        token = dest.lstrip("!")
+        full = f"!{token}"
+        if full in self._mesh_nodes:
+            return full
+        # Short name match (e.g. "TSSV")
+        by_name = [nid for nid, n in self._mesh_nodes.items()
+                   if n.short_name.lower() == token.lower()]
+        if len(by_name) == 1:
+            nid = by_name[0]
+            self.notify(f"{token} → {nid}", title="Node", timeout=3)
+            return nid
+        # Hex suffix match (e.g. "1244" → "!7a781244")
+        by_suffix = [nid for nid in self._mesh_nodes if nid.endswith(token)]
+        if len(by_suffix) == 1:
+            n = self._mesh_nodes[by_suffix[0]]
+            self.notify(f"{token} → {by_suffix[0]} ({n.short_name})", title="Node", timeout=3)
+            return by_suffix[0]
+        if len(by_name) > 1 or len(by_suffix) > 1:
+            hits = by_name or by_suffix
+            self.notify(
+                f"Ambiguous: {', '.join(hits)}  — use full ID", severity="warning"
+            )
+        return full
+
     def _cmd_msg(self, args: list[str]) -> None:
+        channel_index = 0
+        if args and args[0].startswith("#"):
+            try:
+                channel_index = int(args[0][1:])
+                args = args[1:]
+            except ValueError:
+                self.notify("Channel must be a number: #0  #1  …", severity="warning")
+                return
         if len(args) < 2:
-            self.notify("Usage: msg <NODE_ID|^all> <text>", severity="warning")
+            self.notify("Usage: msg [#<ch>] <NODE_ID|^all> <text>", severity="warning")
             return
         dest, text = args[0], " ".join(args[1:])
+        dest = self._resolve_node(dest)
+        self._last_msg_dest = dest
         iface = self._get_iface() if self._get_iface else None
+        ch_label = f"ch#{channel_index}"
 
         def _send() -> None:
             try:
                 from meshtop.mesh_sender import send_text
 
                 result = send_text(
-                    self._cfg.source.lora, self._serial_port, dest, text, iface=iface
+                    self._cfg.source.lora, self._serial_port, dest, text,
+                    iface=iface, channel_index=channel_index,
                 )
                 ts = datetime.now(UTC).strftime("%H:%M:%S")
                 self.call_from_thread(
                     self.query_one("#msg-log", RichLog).write,
-                    f"[dim]{ts}[/]  [cyan]TX[/] [dim]->[/] [magenta]{dest}[/]\n  {text}",
+                    f"[dim]{ts}[/]  [green]TX[/] [dim]{ch_label}[/]"
+                    f"  me [dim]→[/] [magenta]{dest}[/]\n  {text}",
                 )
                 self.call_from_thread(self.notify, result)
             except Exception as e:
                 self.call_from_thread(self.notify, str(e), "Send failed", "error")
 
         threading.Thread(target=_send, daemon=True).start()
-        self.notify(f"Sending to {dest}…")
+        self.notify(f"Sending to {dest} ({ch_label})…")
 
     def _cmd_beacon(self, args: list[str]) -> None:
         if not self._aprs:
@@ -844,9 +1056,7 @@ class MeshtopApp(App[None]):
             if len(args) < 2:
                 self.notify("Usage: pos send <NODE_ID>", severity="warning")
                 return
-            dest = args[1]
-            if not dest.startswith("!"):
-                dest = f"!{dest}"
+            dest = self._resolve_node(args[1])
             pos = self._last_pos
             if pos is None:
                 self.notify("No position data yet", severity="warning")
@@ -883,16 +1093,17 @@ class MeshtopApp(App[None]):
         if not self._mesh_nodes:
             self.notify("No nodes heard yet", severity="warning")
             return
-        lines = [f"{n.long_name} ({n.short_name})  {nid}" for nid, n in self._mesh_nodes.items()]
+        lines = [
+            f"{n.short_name:<6}  {nid}  {n.long_name}"
+            for nid, n in self._mesh_nodes.items()
+        ]
         self.notify("\n".join(lines), title=f"Nodes ({len(self._mesh_nodes)})", timeout=8)
 
     def _cmd_trace(self, args: list[str]) -> None:
         if not args:
             self.notify("Usage: trace <NODE_ID>  (e.g. trace !7a78e5e3)", severity="warning")
             return
-        dest = args[0]
-        if not dest.startswith("!"):
-            dest = f"!{dest}"
+        dest = self._resolve_node(args[0])
         iface = self._get_iface() if self._get_iface else None
         if iface is None:
             self.notify("No live connection — cannot send traceroute", severity="warning")
@@ -913,9 +1124,7 @@ class MeshtopApp(App[None]):
         if not args:
             self.notify("Usage: info <NODE_ID>", severity="warning")
             return
-        dest = args[0]
-        if not dest.startswith("!"):
-            dest = f"!{dest}"
+        dest = self._resolve_node(args[0])
         iface = self._get_iface() if self._get_iface else None
         if iface is None:
             self.notify("No live connection — cannot send user info", severity="warning")
@@ -1035,6 +1244,19 @@ class MeshtopApp(App[None]):
 
         threading.Thread(target=_do, daemon=True).start()
 
+    def _cmd_channel(self, args: list[str]) -> None:
+        def _on_result(channels: dict[str, ChannelConfig] | None) -> None:
+            if channels is None:
+                return
+            self._cfg.source.lora.channels.clear()
+            self._cfg.source.lora.channels.update(channels)
+            if self._save_channels:
+                self._save_channels()
+            self.notify("Channel settings saved", title="Channels")
+            self._refresh_sinks()
+
+        self.push_screen(ChannelConfigScreen(dict(self._cfg.source.lora.channels)), _on_result)
+
     def _cmd_log(self) -> None:
         self.push_screen(LogScreen())
 
@@ -1046,9 +1268,10 @@ class MeshtopApp(App[None]):
             "serial off  —  disconnect serial",
             "wifi <HOST>  —  connect via WiFi/TCP (e.g. wifi 192.168.1.100)",
             "wifi off  —  disconnect WiFi/TCP",
-            "msg <NODE_ID|^all> <text>  —  send Meshtastic message",
+            "msg [#<ch>] <NODE_ID|^all> <text>  —  send message (#0 primary, #1 secondary, …)",
             "send  (alias for msg)",
             "beacon on|off  —  toggle APRS beaconing",
+            "channel  —  edit MQTT channel encryption settings",
             "pos  —  show current position",
             "pos send <NODE_ID>  —  exchange positions with a node",
             "info <NODE_ID>  —  exchange user info with a node",
