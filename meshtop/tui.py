@@ -433,7 +433,8 @@ class CommandSuggester(Suggester):
         "beacon": ["on", "off"],
         "ble": ["on", "off"],
         "serial": ["on", "off"],
-        "pos": ["send"],
+        "pos": ["send <NODE_ID>"],
+        "info": ["<NODE_ID>"],
         "trace": ["<NODE_ID>"],
         "node": [],
         "log": [],
@@ -590,11 +591,26 @@ class MeshtopApp(App[None]):
         _mode_map = {"lora": "MQTT", "serial": "USB", "ble": "BLE"}
         _mode = _mode_map.get(self._cfg.source.type, self._cfg.source.type.upper())
         self.sub_title = f"{self._cfg.aprs.callsign}  [{_mode}]"
-        self.query_one("#msg-log", RichLog).border_title = "Messages"
-        self.query_one("#event-log", RichLog).border_title = "Events"
+        msg_log = self.query_one("#msg-log", RichLog)
+        msg_log.border_title = "Messages"
+        msg_log.tooltip = "Incoming and outgoing Meshtastic messages"
+        event_log = self.query_one("#event-log", RichLog)
+        event_log.border_title = "Events"
+        event_log.tooltip = "Node events, telemetry, traceroute results"
+        self.query_one("#pos-panel").tooltip = "GPS position from connected device"
+        self.query_one("#tel-panel").tooltip = "Device telemetry (battery, voltage, uptime)"
+        self.query_one("#node-panel").tooltip = "Local node identity"
+        self.query_one("#sinks-panel").tooltip = "Active output sinks (APRS, NMEA, gpsd, rigtop)"
+        self.query_one("#nodes-panel").tooltip = "Mesh nodes heard via BLE/serial/MQTT"
+        cmd = self.query_one("#cmd-input", Input)
+        cmd.tooltip = (
+            "Commands: ble on/off · serial on/off · beacon on/off · "
+            "msg <NODE> <text> · pos send <NODE> · info <NODE> · "
+            "trace <NODE> · node · log · help"
+        )
         self.set_interval(1.0, self._tick)
         self._refresh_sinks()
-        self.call_after_refresh(self.query_one("#cmd-input", Input).focus)
+        self.call_after_refresh(cmd.focus)
 
     def action_clear_input(self) -> None:
         inp = self.query_one("#cmd-input", Input)
@@ -757,6 +773,7 @@ class MeshtopApp(App[None]):
             "ble": self._cmd_ble,
             "serial": self._cmd_serial,
             "pos": self._cmd_pos,
+            "info": self._cmd_info,
             "trace": self._cmd_trace,
             "node": lambda _: self._cmd_node(),
             "log": lambda _: self._cmd_log(),
@@ -822,6 +839,12 @@ class MeshtopApp(App[None]):
 
     def _cmd_pos(self, args: list[str]) -> None:
         if args and args[0].lower() == "send":
+            if len(args) < 2:
+                self.notify("Usage: pos send <NODE_ID>", severity="warning")
+                return
+            dest = args[1]
+            if not dest.startswith("!"):
+                dest = f"!{dest}"
             pos = self._last_pos
             if pos is None:
                 self.notify("No position data yet", severity="warning")
@@ -834,13 +857,13 @@ class MeshtopApp(App[None]):
             def _send() -> None:
                 try:
                     from meshtop.mesh_sender import send_position
-                    send_position(iface, pos.lat, pos.lon, pos.alt)
-                    self.call_from_thread(self.notify, "Position broadcast sent", "Position")
+                    send_position(iface, pos.lat, pos.lon, pos.alt, dest=dest)
+                    self.call_from_thread(self.notify, f"Position sent to {dest}", "Position")
                 except Exception as e:
                     self.call_from_thread(self.notify, str(e), "Send failed", "error")
 
             threading.Thread(target=_send, daemon=True).start()
-            self.notify("Broadcasting position…")
+            self.notify(f"Sending position to {dest}…")
             return
         pos = self._last_pos
         if pos is None:
@@ -883,6 +906,29 @@ class MeshtopApp(App[None]):
 
         threading.Thread(target=_send, daemon=True).start()
         self.notify(f"Sending traceroute to {dest}…")
+
+    def _cmd_info(self, args: list[str]) -> None:
+        if not args:
+            self.notify("Usage: info <NODE_ID>", severity="warning")
+            return
+        dest = args[0]
+        if not dest.startswith("!"):
+            dest = f"!{dest}"
+        iface = self._get_iface() if self._get_iface else None
+        if iface is None:
+            self.notify("No live connection — cannot send user info", severity="warning")
+            return
+
+        def _send() -> None:
+            try:
+                from meshtop.mesh_sender import send_user_info
+                send_user_info(iface, dest)
+                self.call_from_thread(self.notify, f"User info sent to {dest}", "Info")
+            except Exception as e:
+                self.call_from_thread(self.notify, str(e), "Info send failed", "error")
+
+        threading.Thread(target=_send, daemon=True).start()
+        self.notify(f"Sending user info to {dest}…")
 
     def _cmd_ble(self, args: list[str]) -> None:
         action = args[0].lower() if args else "on"
@@ -967,7 +1013,8 @@ class MeshtopApp(App[None]):
             "send  (alias for msg)",
             "beacon on|off  —  toggle APRS beaconing",
             "pos  —  show current position",
-            "pos send  —  broadcast position to mesh",
+            "pos send <NODE_ID>  —  exchange positions with a node",
+            "info <NODE_ID>  —  exchange user info with a node",
             "trace <NODE_ID>  —  send traceroute request",
             "node  —  list heard nodes",
             "log  —  view log file",
