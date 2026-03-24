@@ -496,6 +496,11 @@ class MeshtopApp(App[None]):
         border: none;
         background: $panel;
     }
+    #cmd-hint {
+        height: 1;
+        color: $text-muted;
+        padding: 0 1;
+    }
     """
 
     BINDINGS: ClassVar[list] = [
@@ -581,36 +586,26 @@ class MeshtopApp(App[None]):
         with Horizontal(id="cmd-bar"):
             yield Label("❯ ", id="cmd-prompt")
             yield Input(
-                placeholder="ble on/off  •  serial on/off  •  beacon on/off  •  msg <NODE> <text>",
+                placeholder="type a command or F1 for help",
                 id="cmd-input",
                 suggester=CommandSuggester(),
             )
+        yield Static(
+            "ble · serial · beacon · msg <NODE> <text> · "
+            "pos send <NODE> · info <NODE> · trace <NODE> · node · log · F1 help",
+            id="cmd-hint",
+        )
 
     def on_mount(self) -> None:
         self.title = "meshtop"
         _mode_map = {"lora": "MQTT", "serial": "USB", "ble": "BLE"}
         _mode = _mode_map.get(self._cfg.source.type, self._cfg.source.type.upper())
         self.sub_title = f"{self._cfg.aprs.callsign}  [{_mode}]"
-        msg_log = self.query_one("#msg-log", RichLog)
-        msg_log.border_title = "Messages"
-        msg_log.tooltip = "Incoming and outgoing Meshtastic messages"
-        event_log = self.query_one("#event-log", RichLog)
-        event_log.border_title = "Events"
-        event_log.tooltip = "Node events, telemetry, traceroute results"
-        self.query_one("#pos-panel").tooltip = "GPS position from connected device"
-        self.query_one("#tel-panel").tooltip = "Device telemetry (battery, voltage, uptime)"
-        self.query_one("#node-panel").tooltip = "Local node identity"
-        self.query_one("#sinks-panel").tooltip = "Active output sinks (APRS, NMEA, gpsd, rigtop)"
-        self.query_one("#nodes-panel").tooltip = "Mesh nodes heard via BLE/serial/MQTT"
-        cmd = self.query_one("#cmd-input", Input)
-        cmd.tooltip = (
-            "Commands: ble on/off · serial on/off · beacon on/off · "
-            "msg <NODE> <text> · pos send <NODE> · info <NODE> · "
-            "trace <NODE> · node · log · help"
-        )
+        self.query_one("#msg-log", RichLog).border_title = "Messages"
+        self.query_one("#event-log", RichLog).border_title = "Events"
         self.set_interval(1.0, self._tick)
         self._refresh_sinks()
-        self.call_after_refresh(cmd.focus)
+        self.call_after_refresh(self.query_one("#cmd-input", Input).focus)
 
     def action_clear_input(self) -> None:
         inp = self.query_one("#cmd-input", Input)
