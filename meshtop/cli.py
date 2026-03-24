@@ -272,7 +272,10 @@ def main(
         def _start_mqtt_observer() -> None:
             from meshtop.sources.meshtastic import MeshtasticSource
             obs_cfg = cfg.source.lora.model_copy(update={"node_id": ""})
-            obs = MeshtasticSource(obs_cfg, on_nodeinfo=on_nodeinfo)
+            # Forward text only when primary source is not lora (avoids duplicates when
+            # both the primary MQTT source and the observer would deliver the same packet).
+            obs_text = on_text if cfg.source.type != "lora" else None
+            obs = MeshtasticSource(obs_cfg, on_nodeinfo=on_nodeinfo, on_text=obs_text)
             try:
                 obs.start()
                 mqtt_obs[0] = obs

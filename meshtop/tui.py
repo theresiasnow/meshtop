@@ -1006,26 +1006,25 @@ class MeshtopApp(App[None]):
         iface = self._get_iface() if self._get_iface else None
         ch_label = f"ch#{channel_index}"
 
+        # Show TX immediately so the user sees it regardless of send latency/failure.
+        ts = datetime.now(UTC).strftime("%H:%M:%S")
+        self.query_one("#msg-log", RichLog).write(
+            f"[dim]{ts}[/]  [green]TX[/] [dim]{ch_label}[/]"
+            f"  me [dim]→[/] [magenta]{dest}[/]\n  {text}"
+        )
+
         def _send() -> None:
             try:
                 from meshtop.mesh_sender import send_text
 
-                result = send_text(
+                send_text(
                     self._cfg.source.lora, self._serial_port, dest, text,
                     iface=iface, channel_index=channel_index,
                 )
-                ts = datetime.now(UTC).strftime("%H:%M:%S")
-                self.call_from_thread(
-                    self.query_one("#msg-log", RichLog).write,
-                    f"[dim]{ts}[/]  [green]TX[/] [dim]{ch_label}[/]"
-                    f"  me [dim]→[/] [magenta]{dest}[/]\n  {text}",
-                )
-                self.call_from_thread(self.notify, result)
             except Exception as e:
                 self.call_from_thread(self.notify, str(e), "Send failed", "error")
 
         threading.Thread(target=_send, daemon=True).start()
-        self.notify(f"Sending to {dest} ({ch_label})…")
 
     def _cmd_beacon(self, args: list[str]) -> None:
         if not self._aprs:
@@ -1214,20 +1213,33 @@ class MeshtopApp(App[None]):
     def _cmd_wifi(self, args: list[str]) -> None:
         action = args[0] if args else ""
         if action.lower() == "off":
-            if self._on_disconnect is None:
-                self.notify("Not connected", severity="warning")
-                return
-            def _do_off() -> None:
-                self._on_disconnect()
-                self.call_from_thread(lambda: self.notify("WiFi/TCP disconnected", title="WiFi"))
-            threading.Thread(target=_do_off, daemon=True).start()
+            self._cfg.source.lora.device_host = ""
+            if self._cfg.source.type == "tcp" and self._on_disconnect:
+                def _do_off() -> None:
+                    self._on_disconnect()
+                    self.call_from_thread(
+                        lambda: self.notify("WiFi/TCP disconnected", title="WiFi")
+                    )
+                threading.Thread(target=_do_off, daemon=True).start()
+            else:
+                self.notify("Send via WiFi cleared", title="WiFi")
             return
         host = action if action else ""
         if not host:
             self.notify("Usage: wifi <HOST|IP>  (e.g. wifi 192.168.1.100)", severity="warning")
             return
+
+        # Always update device_host so send_text can reach the node.
+        self._cfg.source.lora.device_host = host
+
+        # On MQTT source: keep receiving via MQTT, just enable sending via TCP.
+        if self._cfg.source.type == "lora":
+            self.notify(f"Send via {host} (MQTT receive unchanged)", title="WiFi")
+            return
+
+        # On other sources: connect as TCP source too.
         if self._on_connect is None:
-            self.notify(f"TCP host: {host}", title="WiFi")
+            self.notify(f"Send via {host}", title="WiFi")
             return
         self.notify(f"Connecting to {host}…", title="WiFi", timeout=30)
 
