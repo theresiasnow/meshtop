@@ -287,6 +287,8 @@ def main(
                     sink.stop()
                 except Exception:
                     pass
+            import os
+            os._exit(0)
 
     else:
         console.print(f"[bold green]lorabridge[/] starting — source=[cyan]{cfg.source.type}[/]")

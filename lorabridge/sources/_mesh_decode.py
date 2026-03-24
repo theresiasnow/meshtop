@@ -33,10 +33,11 @@ def fire_initial_nodes(
     if on_my_node_id:
         try:
             my_num = getattr(getattr(iface, "myInfo", None), "myNodeNum", None)
+            logger.info(f"[{source_tag}] fire_initial_nodes: myNodeNum={my_num}")
             if my_num:
                 on_my_node_id(f"!{my_num:08x}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.info(f"[{source_tag}] fire_initial_nodes: myNodeNum error: {e}")
     nodes: dict = getattr(iface, "nodes", None) or {}
     logger.info(f"[{source_tag}] fire_initial_nodes: {len(nodes)} node(s) in DB")
     for node_id, node in nodes.items():

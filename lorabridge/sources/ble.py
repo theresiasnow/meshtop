@@ -99,9 +99,9 @@ class BleSource:
         except Exception:
             pass
         if self._iface:
-            try:
-                self._iface.close()
-            except Exception:
-                pass
-            self._iface = None
+            import threading
+            iface, self._iface = self._iface, None
+            t = threading.Thread(target=iface.close, daemon=True)
+            t.start()
+            t.join(timeout=3.0)  # give BLE stack 3 s to disconnect cleanly
         logger.info("BleSource stopped")
