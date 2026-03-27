@@ -752,6 +752,7 @@ class MeshtopApp(App[None]):
         self._get_iface: Callable | None = None  # returns live BLE/serial iface or None
         self._save_channels: Callable | None = None  # saves channel cfg and reloads sources
         self._last_msg_dest: str = ""  # last resolved msg destination for ! shortcut
+        self._bat_warned: dict[str, float] = {}  # node_id -> monotonic time of last low-bat notify
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -938,14 +939,17 @@ class MeshtopApp(App[None]):
         self.query_one("#event-log", RichLog).write(
             f"[dim]{ts}[/]  [blue]NODE[/]  {n.long_name} ({n.short_name})  {n.node_id}"
         )
-        # Battery warning
-        if n.battery_level is not None and n.battery_level < 20 and n.battery_level > 0:
-            self.notify(
-                f"{n.short_name} ({n.node_id}) battery at {n.battery_level}%",
-                title="Low battery",
-                severity="warning",
-                timeout=10,
-            )
+        # Battery warning — notify once per 30 min per node when below 20%
+        if n.battery_level is not None and n.battery_level < 20:
+            last = self._bat_warned.get(n.node_id, 0.0)
+            if _time.monotonic() - last >= 1800:
+                self._bat_warned[n.node_id] = _time.monotonic()
+                self.notify(
+                    f"{n.short_name} ({n.node_id}) battery at {n.battery_level}%",
+                    title="Low battery",
+                    severity="warning",
+                    timeout=10,
+                )
 
     def _handle_text(self, m: TextMessage) -> None:
         ts = datetime.now(UTC).strftime("%H:%M:%S")
