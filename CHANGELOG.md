@@ -1,3 +1,9 @@
+## v0.5.0 (2026-03-27)
+
+### Feat
+
+- **release**: add PyInstaller Windows installer, align with rigtop (#11)
+
 ## v0.4.1 (2026-03-27)
 
 ### Fix
