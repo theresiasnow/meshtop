@@ -1,6 +1,6 @@
 [project]
 name = "meshtop"
-version = "0.6.0"
+version = "0.7.0"
 description = "GPS bridge for Meshtastic devices — serial, BLE, TCP and LoRa/MQTT sources with APRS-IS, pi-star, gpsd and rigtop sinks"
 readme = "README.md"
 requires-python = ">=3.14"
