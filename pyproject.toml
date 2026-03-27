@@ -3,7 +3,7 @@ name = "meshtop"
 version = "0.4.1"
 description = "GPS bridge for Meshtastic devices — forwards to pi-star, APRS-IS, gpsd, rigtop"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "bleak>=0.21",
     "cryptography>=46.0.5",
@@ -23,6 +23,7 @@ dependencies = [
 dev = [
     "commitizen>=4.0",
     "pylint>=3.0",
+    "pyinstaller>=6.0",
     "pytest>=8.0",
     "ruff>=0.15",
 ]
@@ -35,7 +36,7 @@ build-backend = "hatchling.build"
 meshtop = "meshtop.cli:app"
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.lint]
@@ -61,7 +62,7 @@ update_changelog_on_bump = true
 major_version_zero = true
 
 [tool.pylint.main]
-py-version = "3.12"
+py-version = "3.14"
 jobs = 0
 
 [tool.pylint."messages control"]
