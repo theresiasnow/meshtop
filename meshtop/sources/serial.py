@@ -70,6 +70,7 @@ class SerialSource:
             self._iface = SerialInterface(self._cfg.port, timeout=30)
         except Exception:
             import gc
+
             gc.collect()  # ensure partially-constructed SerialInterface releases the port
             raise
         logger.info(f"SerialSource started on {self._cfg.port}")
@@ -77,6 +78,7 @@ class SerialSource:
     def stop(self) -> None:
         try:
             from pubsub import pub
+
             if self._receive_sub:
                 pub.unsubscribe(self._receive_sub, "meshtastic.receive")
             if self._connect_sub:

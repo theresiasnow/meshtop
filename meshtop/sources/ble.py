@@ -51,9 +51,7 @@ class BleSource:
         class _PairableBLEInterface(BLEInterface):
             def connect(self, address=None):
                 ble_device = self.find_device(address)
-                client = BLEClient(
-                    ble_device.address, disconnected_callback=lambda _: self.close()
-                )
+                client = BLEClient(ble_device.address, disconnected_callback=lambda _: self.close())
                 client.connect()
                 try:
                     client.pair()
@@ -112,9 +110,7 @@ class BleSource:
                 break
             age = time.monotonic() - self._last_rx
             if age >= _WATCHDOG_TIMEOUT:
-                logger.warning(
-                    f"BLE watchdog: no packets for {age:.0f}s — forcing disconnect"
-                )
+                logger.warning(f"BLE watchdog: no packets for {age:.0f}s — forcing disconnect")
                 try:
                     self._iface.close()
                 except Exception:
@@ -125,6 +121,7 @@ class BleSource:
         self._watchdog_stop.set()
         try:
             from pubsub import pub
+
             if self._receive_sub:
                 pub.unsubscribe(self._receive_sub, "meshtastic.receive")
             if self._connect_sub:

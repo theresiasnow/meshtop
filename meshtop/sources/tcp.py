@@ -76,6 +76,7 @@ class TcpSource:
     def stop(self) -> None:
         try:
             from pubsub import pub
+
             if self._receive_sub:
                 pub.unsubscribe(self._receive_sub, "meshtastic.receive")
             if self._connect_sub:

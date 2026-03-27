@@ -32,9 +32,8 @@ def fire_initial_nodes(
     """
     if on_my_node_id:
         try:
-            my_num = (
-                getattr(getattr(iface, "localNode", None), "nodeNum", None)
-                or getattr(getattr(iface, "myInfo", None), "myNodeNum", None)
+            my_num = getattr(getattr(iface, "localNode", None), "nodeNum", None) or getattr(
+                getattr(iface, "myInfo", None), "myNodeNum", None
             )
             if my_num:
                 on_my_node_id(f"!{my_num:08x}")
@@ -48,35 +47,41 @@ def fire_initial_nodes(
         try:
             if on_nodeinfo and "user" in node:
                 u = node["user"]
-                on_nodeinfo(NodeInfo(
-                    node_id=u.get("id", node_id),
-                    long_name=u.get("longName", ""),
-                    short_name=u.get("shortName", ""),
-                ))
+                on_nodeinfo(
+                    NodeInfo(
+                        node_id=u.get("id", node_id),
+                        long_name=u.get("longName", ""),
+                        short_name=u.get("shortName", ""),
+                    )
+                )
             if on_position and "position" in node:
                 p = node["position"]
                 lat_i = p.get("latitudeI", 0)
                 lon_i = p.get("longitudeI", 0)
                 if lat_i or lon_i:
-                    on_position(Position(
-                        lat=lat_i * 1e-7,
-                        lon=lon_i * 1e-7,
-                        alt=float(p.get("altitude", 0)),
-                        speed=0.0,
-                        course=0.0,
-                        fix=True,
-                        sats=p.get("satsInView", 0),
-                        timestamp=datetime.now(UTC),
-                    ))
+                    on_position(
+                        Position(
+                            lat=lat_i * 1e-7,
+                            lon=lon_i * 1e-7,
+                            alt=float(p.get("altitude", 0)),
+                            speed=0.0,
+                            course=0.0,
+                            fix=True,
+                            sats=p.get("satsInView", 0),
+                            timestamp=datetime.now(UTC),
+                        )
+                    )
             if on_telemetry and "deviceMetrics" in node:
                 dm = node["deviceMetrics"]
-                on_telemetry(DeviceMetrics(
-                    battery_level=dm.get("batteryLevel", 0),
-                    voltage=dm.get("voltage", 0.0),
-                    uptime_seconds=dm.get("uptimeSeconds", 0),
-                    channel_utilization=dm.get("channelUtilization", 0.0),
-                    air_util_tx=dm.get("airUtilTx", 0.0),
-                ))
+                on_telemetry(
+                    DeviceMetrics(
+                        battery_level=dm.get("batteryLevel", 0),
+                        voltage=dm.get("voltage", 0.0),
+                        uptime_seconds=dm.get("uptimeSeconds", 0),
+                        channel_utilization=dm.get("channelUtilization", 0.0),
+                        air_util_tx=dm.get("airUtilTx", 0.0),
+                    )
+                )
         except Exception as e:
             logger.debug(f"[{source_tag}] initial node drain error {node_id}: {e}")
 
@@ -145,23 +150,27 @@ def _tel(tel: dict, cb: Callable) -> None:
     dm = tel.get("deviceMetrics", {})
     if not dm:
         return
-    cb(DeviceMetrics(
-        battery_level=dm.get("batteryLevel", 0),
-        voltage=dm.get("voltage", 0.0),
-        uptime_seconds=dm.get("uptimeSeconds", 0),
-        channel_utilization=dm.get("channelUtilization", 0.0),
-        air_util_tx=dm.get("airUtilTx", 0.0),
-    ))
+    cb(
+        DeviceMetrics(
+            battery_level=dm.get("batteryLevel", 0),
+            voltage=dm.get("voltage", 0.0),
+            uptime_seconds=dm.get("uptimeSeconds", 0),
+            channel_utilization=dm.get("channelUtilization", 0.0),
+            air_util_tx=dm.get("airUtilTx", 0.0),
+        )
+    )
 
 
 def _node(user: dict, from_id: str, cb: Callable) -> None:
     if not user:
         return
-    cb(NodeInfo(
-        node_id=user.get("id", from_id),
-        long_name=user.get("longName", ""),
-        short_name=user.get("shortName", ""),
-    ))
+    cb(
+        NodeInfo(
+            node_id=user.get("id", from_id),
+            long_name=user.get("longName", ""),
+            short_name=user.get("shortName", ""),
+        )
+    )
 
 
 def _trace(decoded: dict, from_id: str, cb: Callable, tag: str) -> None:

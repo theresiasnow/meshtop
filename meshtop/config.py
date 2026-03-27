@@ -52,8 +52,8 @@ def _validate_psk(v: str) -> str:
 
 class ChannelConfig(BaseModel):
     enabled: bool = True
-    encrypted: bool = False   # True = decrypt with key below
-    key: str = ""             # base64 PSK — 1 byte shorthand, 16 (AES-128), or 32 (AES-256) bytes
+    encrypted: bool = False  # True = decrypt with key below
+    key: str = ""  # base64 PSK — 1 byte shorthand, 16 (AES-128), or 32 (AES-256) bytes
 
     @field_validator("key")
     @classmethod
@@ -67,10 +67,10 @@ class LoraSourceConfig(BaseModel):
     username: str = "meshdev"
     password: str = "large4cats"
     topic: str = "msh/EU_868/SE/#"
-    node_id: str = ""                        # e.g. "!7a78e5e3" — filter to own node only
+    node_id: str = ""  # e.g. "!7a78e5e3" — filter to own node only
     # Primary channel (index 0) has no user-assigned name; uses this predetermined PSK.
     # "AQ==" is the Meshtastic shorthand for the default 128-bit key (as shown in the app).
-    primary_key: str = _DEFAULT_PSK          # base64 PSK — 1, 16, or 32 bytes
+    primary_key: str = _DEFAULT_PSK  # base64 PSK — 1, 16, or 32 bytes
     channels: dict[str, ChannelConfig] = {}  # named secondary channels (index 1+) → config
     # Meshtastic TCP server for sending (e.g. "192.168.1.100")
     device_host: str = ""
@@ -82,12 +82,12 @@ class LoraSourceConfig(BaseModel):
 
 
 class BleSourceConfig(BaseModel):
-    device: str = ""   # device name or BLE address; empty = auto-discover first found
+    device: str = ""  # device name or BLE address; empty = auto-discover first found
 
 
 class TcpSourceConfig(BaseModel):
-    host: str = ""     # IP or hostname of the Meshtastic device
-    port: int = 4403   # default Meshtastic TCP port
+    host: str = ""  # IP or hostname of the Meshtastic device
+    port: int = 4403  # default Meshtastic TCP port
 
 
 class SourceConfig(BaseModel):
@@ -142,5 +142,6 @@ def load_config(path: Path) -> Config:
 
 def save_config(cfg: Config, path: Path) -> None:
     import tomli_w
+
     with path.open("wb") as f:
         tomli_w.dump(cfg.model_dump(), f)

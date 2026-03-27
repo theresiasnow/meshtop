@@ -16,9 +16,11 @@ def _fallback_iface(cfg: LoraSourceConfig, serial_port: str):
     """Context-manager that yields a fresh send interface (TCP or serial)."""
     if cfg.device_host:
         from meshtastic.tcp_interface import TCPInterface
+
         return TCPInterface(cfg.device_host)
     if serial_port:
         from meshtastic.serial_interface import SerialInterface
+
         return SerialInterface(serial_port)
     raise ValueError(
         "No send interface — set source.lora.device_host (TCP) "
@@ -59,12 +61,16 @@ def send_user_info(iface: Any, dest: str) -> None:
     u.id = node_id
     if local.localConfig and hasattr(local, "nodeInfo") and local.nodeInfo:
         info = local.nodeInfo
-        u.long_name = getattr(info, "user", {}).get("longName", "") if isinstance(
-            getattr(info, "user", None), dict
-        ) else getattr(getattr(info, "user", None), "longName", "")
-        u.short_name = getattr(info, "user", {}).get("shortName", "") if isinstance(
-            getattr(info, "user", None), dict
-        ) else getattr(getattr(info, "user", None), "shortName", "")
+        u.long_name = (
+            getattr(info, "user", {}).get("longName", "")
+            if isinstance(getattr(info, "user", None), dict)
+            else getattr(getattr(info, "user", None), "longName", "")
+        )
+        u.short_name = (
+            getattr(info, "user", {}).get("shortName", "")
+            if isinstance(getattr(info, "user", None), dict)
+            else getattr(getattr(info, "user", None), "shortName", "")
+        )
     # Prefer the nodes dict which is always populated after connection
     node_entry = (iface.nodes or {}).get(node_id) or (iface.nodes or {}).get(node_num)
     if node_entry:

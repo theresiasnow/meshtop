@@ -20,7 +20,6 @@ app = typer.Typer(help="GPS bridge -- Meshtastic device to pi-star / APRS / gpsd
 console = Console()
 
 
-
 def _friendly_error(exc: Exception) -> str:
     msg = str(exc)
     lmsg = msg.lower()
@@ -43,8 +42,9 @@ def _friendly_error(exc: Exception) -> str:
     return f"{type(exc).__name__}: {msg}"
 
 
-def _build_source(cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_status,
-                  on_traceroute=None):
+def _build_source(
+    cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_status, on_traceroute=None
+):
     """Instantiate and return the configured source (lora/serial/ble)."""
     src_type = cfg.source.type
 
@@ -59,6 +59,7 @@ def _build_source(cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_statu
         )
     if src_type == "serial":
         from meshtop.sources.serial import SerialSource
+
         return SerialSource(
             cfg.source,
             on_position=on_position,
@@ -70,6 +71,7 @@ def _build_source(cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_statu
         )
     if src_type == "ble":
         from meshtop.sources.ble import BleSource
+
         return BleSource(
             cfg.source,
             on_position=on_position,
@@ -81,6 +83,7 @@ def _build_source(cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_statu
         )
     if src_type == "tcp":
         from meshtop.sources.tcp import TcpSource
+
         return TcpSource(
             cfg.source,
             on_position=on_position,
@@ -208,6 +211,7 @@ def main(
             Must run from a background thread while the TUI event loop is live.
             """
             from meshtop.sources._mesh_decode import fire_initial_nodes
+
             if hasattr(src, "_iface") and src._iface:
                 fire_initial_nodes(
                     src._iface,
@@ -230,7 +234,12 @@ def main(
             elif source_type == "tcp":
                 cfg.source.tcp.host = device
             new_src = _build_source(
-                cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_status,
+                cfg,
+                on_position,
+                on_telemetry,
+                on_nodeinfo,
+                on_text,
+                on_status,
                 on_traceroute=on_traceroute,
             )
             try:
@@ -254,6 +263,7 @@ def main(
 
         def _save_channels() -> None:
             from meshtop.config import save_config
+
             save_config(cfg, config)
             for src in [src_ref[0], mqtt_obs[0]]:
                 if src is not None and hasattr(src, "reload_channels"):
@@ -271,6 +281,7 @@ def main(
 
         def _start_mqtt_observer() -> None:
             from meshtop.sources.meshtastic import MeshtasticSource
+
             obs_cfg = cfg.source.lora.model_copy(update={"node_id": ""})
             # Forward text only when primary source is not lora (avoids duplicates when
             # both the primary MQTT source and the observer would deliver the same packet).
@@ -286,7 +297,12 @@ def main(
 
         if cfg.source.type != "none":
             src_ref[0] = _build_source(
-                cfg, on_position, on_telemetry, on_nodeinfo, on_text, on_status,
+                cfg,
+                on_position,
+                on_telemetry,
+                on_nodeinfo,
+                on_text,
+                on_status,
                 on_traceroute=on_traceroute,
             )
 
@@ -346,6 +362,7 @@ def main(
                 except Exception:
                     pass
             import os
+
             os._exit(0)
 
     else:

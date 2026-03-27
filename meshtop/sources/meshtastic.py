@@ -240,6 +240,7 @@ class MeshtasticSource:
 
     def _decrypt(self, packet: MeshPacket, key: bytes):
         from meshtastic.protobuf.mesh_pb2 import Data
+
         try:
             pid = packet.id
             fn = getattr(packet, "from")

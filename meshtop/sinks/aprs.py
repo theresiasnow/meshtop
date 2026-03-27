@@ -35,7 +35,7 @@ class AprsSink:
         self._keepalive_thread: threading.Thread | None = None
         self._filter_sent = False
         self.on_beacon: callable | None = None  # called after each successful beacon
-        self.beacon_enabled: bool = True        # toggled by TUI :beacon on/off
+        self.beacon_enabled: bool = True  # toggled by TUI :beacon on/off
 
     @property
     def connected(self) -> bool:
@@ -83,10 +83,7 @@ class AprsSink:
             return
         lat_str = _format_lat(pos.lat)
         lon_str = _format_lon(pos.lon)
-        packet = (
-            f"{self._cfg.callsign}>APRS,TCPIP*:"
-            f"!{lat_str}/{lon_str}>{self._cfg.comment}\r\n"
-        )
+        packet = f"{self._cfg.callsign}>APRS,TCPIP*:!{lat_str}/{lon_str}>{self._cfg.comment}\r\n"
         try:
             sock.sendall(packet.encode("ascii"))
             self._last_beacon = now
