@@ -73,3 +73,12 @@ uv run ruff check meshtop/
 ## Branch workflow
 
 Same as rigtop — `feat/*` / `fix/*`, never commit directly to main.
+
+## Pull requests
+
+When creating a PR:
+
+1. Push the branch and create the PR with `gh pr create`
+2. Always assign **Copilot** as a reviewer: `gh pr edit <number> --add-reviewer copilot`
+3. After creating the PR, wait for Copilot's review comments: `gh pr checks <number> --watch`
+4. Read review comments with `gh pr view <number> --comments` and address any issues before merging
