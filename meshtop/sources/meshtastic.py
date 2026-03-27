@@ -34,6 +34,12 @@ class NodeInfo:
     long_name: str = ""
     short_name: str = ""
     hw_model: int = 0
+    snr: float | None = None
+    rssi: int | None = None
+    hops_away: int | None = None
+    last_heard: datetime | None = None
+    battery_level: int | None = None
+    voltage: float | None = None
 
 
 @dataclass

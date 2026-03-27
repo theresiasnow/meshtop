@@ -47,11 +47,17 @@ def fire_initial_nodes(
         try:
             if on_nodeinfo and "user" in node:
                 u = node["user"]
+                lh = node.get("lastHeard")
                 on_nodeinfo(
                     NodeInfo(
                         node_id=u.get("id", node_id),
                         long_name=u.get("longName", ""),
                         short_name=u.get("shortName", ""),
+                        snr=node.get("snr"),
+                        hops_away=node.get("hopsAway"),
+                        last_heard=datetime.fromtimestamp(lh, UTC) if lh else None,
+                        battery_level=node.get("deviceMetrics", {}).get("batteryLevel"),
+                        voltage=node.get("deviceMetrics", {}).get("voltage"),
                     )
                 )
             if on_position and "position" in node:
@@ -118,7 +124,7 @@ def decode_packet(
         elif portnum == "TELEMETRY_APP" and on_telemetry:
             _tel(decoded.get("telemetry", {}), on_telemetry)
         elif portnum == "NODEINFO_APP" and on_nodeinfo:
-            _node(decoded.get("user", {}), from_id, on_nodeinfo)
+            _node(decoded.get("user", {}), from_id, packet, on_nodeinfo)
         elif portnum == "TEXT_MESSAGE_APP" and on_text:
             _txt(decoded, packet, from_id, on_text)
         elif portnum == "TRACEROUTE_APP" and on_traceroute:
@@ -161,14 +167,21 @@ def _tel(tel: dict, cb: Callable) -> None:
     )
 
 
-def _node(user: dict, from_id: str, cb: Callable) -> None:
+def _node(user: dict, from_id: str, packet: dict, cb: Callable) -> None:
     if not user:
         return
+    hop_start = packet.get("hopStart", 0)
+    hop_limit = packet.get("hopLimit", 0)
+    hops_away = (hop_start - hop_limit) if hop_start else None
     cb(
         NodeInfo(
             node_id=user.get("id", from_id),
             long_name=user.get("longName", ""),
             short_name=user.get("shortName", ""),
+            snr=packet.get("rxSnr"),
+            rssi=packet.get("rxRssi"),
+            hops_away=hops_away,
+            last_heard=datetime.now(UTC),
         )
     )
 

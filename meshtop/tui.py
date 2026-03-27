@@ -171,10 +171,36 @@ class NodesPanel(Static):
         if not nodes:
             txt.append(" (none yet)", style="dim")
         else:
-            for nid, n in list(nodes.items())[-6:]:  # show latest 6
+            now = datetime.now(UTC)
+            for nid, n in list(nodes.items())[-6:]:
+                # short name + node id
                 txt.append(f" {n.short_name:<6}", style="bold cyan")
                 txt.append(f"  {nid}  ", style="dim")
-                txt.append(f"{n.long_name}\n", style="cyan")
+                # hops
+                if n.hops_away is not None:
+                    hop_str = "direct" if n.hops_away == 0 else f"{n.hops_away}hop"
+                    txt.append(f"{hop_str:<7}", style="green" if n.hops_away == 0 else "yellow")
+                else:
+                    txt.append(" " * 7)
+                # SNR
+                if n.snr is not None:
+                    txt.append(f"  SNR:{n.snr:+.0f}", style="dim")
+                # battery
+                if n.battery_level is not None:
+                    bat = n.battery_level
+                    bat_style = "red" if bat < 20 else "yellow" if bat < 40 else "green"
+                    txt.append(f"  🔋{bat}%", style=bat_style)
+                # last heard
+                if n.last_heard:
+                    delta = int((now - n.last_heard).total_seconds())
+                    if delta < 60:
+                        age = f"{delta}s"
+                    elif delta < 3600:
+                        age = f"{delta // 60}m"
+                    else:
+                        age = f"{delta // 3600}h"
+                    txt.append(f"  {age} ago", style="dim")
+                txt.append("\n")
         self.update(txt)
 
 
@@ -592,7 +618,7 @@ class CommandSuggester(Suggester):
         "info": ["<NODE_ID>"],
         "trace": ["<NODE_ID>"],
         "channel": [],
-        "node": [],
+        "node": ["<NODE_ID>"],
         "log": [],
         "help": [],
         "q": [],
@@ -889,7 +915,22 @@ class MeshtopApp(App[None]):
 
     def _handle_nodeinfo(self, n: NodeInfo) -> None:
         self._last_node = n
-        self._mesh_nodes[n.node_id] = n  # upsert, preserves insertion order on update
+        # Merge: keep existing non-None fields if new packet doesn't carry them
+        existing = self._mesh_nodes.get(n.node_id)
+        if existing:
+            if n.snr is None:
+                n.snr = existing.snr
+            if n.rssi is None:
+                n.rssi = existing.rssi
+            if n.hops_away is None:
+                n.hops_away = existing.hops_away
+            if n.last_heard is None:
+                n.last_heard = existing.last_heard
+            if n.battery_level is None:
+                n.battery_level = existing.battery_level
+            if n.voltage is None:
+                n.voltage = existing.voltage
+        self._mesh_nodes[n.node_id] = n
         if not self._local_node_id or n.node_id == self._local_node_id:
             self.query_one("#node-panel", NodePanel).render_data(n)
         self.query_one("#nodes-panel", NodesPanel).render_data(self._mesh_nodes)
@@ -897,6 +938,14 @@ class MeshtopApp(App[None]):
         self.query_one("#event-log", RichLog).write(
             f"[dim]{ts}[/]  [blue]NODE[/]  {n.long_name} ({n.short_name})  {n.node_id}"
         )
+        # Battery warning
+        if n.battery_level is not None and n.battery_level < 20 and n.battery_level > 0:
+            self.notify(
+                f"{n.short_name} ({n.node_id}) battery at {n.battery_level}%",
+                title="Low battery",
+                severity="warning",
+                timeout=10,
+            )
 
     def _handle_text(self, m: TextMessage) -> None:
         ts = datetime.now(UTC).strftime("%H:%M:%S")
@@ -952,7 +1001,7 @@ class MeshtopApp(App[None]):
             "info": self._cmd_info,
             "trace": self._cmd_trace,
             "channel": self._cmd_channel,
-            "node": lambda _: self._cmd_node(),
+            "node": lambda args: self._cmd_node(args),
             "log": lambda _: self._cmd_log(),
             "help": lambda _: self._cmd_help(),
             "q": lambda _: self.exit(),
@@ -1103,12 +1152,48 @@ class MeshtopApp(App[None]):
             timeout=6,
         )
 
-    def _cmd_node(self) -> None:
+    def _cmd_node(self, args: list[str] | None = None) -> None:
         if not self._mesh_nodes:
             self.notify("No nodes heard yet", severity="warning")
             return
-        lines = [f"{n.short_name:<6}  {nid}  {n.long_name}" for nid, n in self._mesh_nodes.items()]
-        self.notify("\n".join(lines), title=f"Nodes ({len(self._mesh_nodes)})", timeout=8)
+        # node <id> — detail view
+        if args:
+            nid = self._resolve_node(args[0])
+            if nid not in self._mesh_nodes:
+                self.notify(f"Node not found: {args[0]}", severity="warning")
+                return
+            n = self._mesh_nodes[nid]
+            now = datetime.now(UTC)
+            lines = [f"{n.long_name} ({n.short_name})  {nid}"]
+            if n.hops_away is not None:
+                lines.append(f"Hops:     {'direct' if n.hops_away == 0 else n.hops_away}")
+            if n.snr is not None:
+                lines.append(f"SNR:      {n.snr:+.1f} dB")
+            if n.rssi is not None:
+                lines.append(f"RSSI:     {n.rssi} dBm")
+            if n.battery_level is not None:
+                volt = f"  {n.voltage:.2f}V" if n.voltage else ""
+                lines.append(f"Battery:  {n.battery_level}%{volt}")
+            if n.last_heard:
+                delta = int((now - n.last_heard).total_seconds())
+                lines.append(f"Heard:    {delta}s ago")
+            self.notify("\n".join(lines), title="Node detail", timeout=10)
+            return
+        # node — list all
+        now = datetime.now(UTC)
+        lines = []
+        for nid, n in self._mesh_nodes.items():
+            hop_str = ""
+            if n.hops_away is not None:
+                hop_str = " direct" if n.hops_away == 0 else f" {n.hops_away}hop"
+            snr_str = f" SNR:{n.snr:+.0f}" if n.snr is not None else ""
+            bat_str = f" 🔋{n.battery_level}%" if n.battery_level is not None else ""
+            age_str = ""
+            if n.last_heard:
+                delta = int((now - n.last_heard).total_seconds())
+                age_str = f" {delta // 60}m ago" if delta >= 60 else f" {delta}s ago"
+            lines.append(f"{n.short_name:<6}  {nid}{hop_str}{snr_str}{bat_str}{age_str}")
+        self.notify("\n".join(lines), title=f"Nodes ({len(self._mesh_nodes)})", timeout=10)
 
     def _cmd_trace(self, args: list[str]) -> None:
         if not args:
@@ -1304,7 +1389,8 @@ class MeshtopApp(App[None]):
             "pos send <NODE_ID>  —  exchange positions with a node",
             "info <NODE_ID>  —  exchange user info with a node",
             "trace <NODE_ID>  —  send traceroute request",
-            "node  —  list heard nodes",
+            "node  —  list heard nodes with SNR/hops/battery",
+            "node <NODE_ID>  —  detail view for a specific node",
             "log  —  view log file",
             "help  —  this message",
             "q / quit  —  exit",
