@@ -34,6 +34,7 @@ class NodeInfo:
     long_name: str = ""
     short_name: str = ""
     hw_model: int = 0
+    role: str = ""
     snr: float | None = None
     rssi: int | None = None
     hops_away: int | None = None
@@ -225,11 +226,18 @@ class MeshtasticSource:
             return
         u = User()
         u.ParseFromString(payload)
+        try:
+            field = u.DESCRIPTOR.fields_by_name["role"]
+            role_name = field.enum_type.values_by_number[u.role].name
+            role = "" if role_name == "CLIENT" else role_name
+        except (KeyError, AttributeError):
+            role = ""
         node = NodeInfo(
             node_id=f"!{getattr(packet, 'from'):08x}",
             long_name=u.long_name,
             short_name=u.short_name,
             hw_model=u.hw_model,
+            role=role,
         )
         logger.debug(f"NodeInfo: {node.long_name} ({node.short_name})")
         self._on_nodeinfo(node)

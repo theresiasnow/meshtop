@@ -128,6 +128,20 @@ class TelemetryPanel(Static):
         self.update(txt)
 
 
+_ROLE_SHORT: dict[str, str] = {
+    "ROUTER": "ROUTER",
+    "ROUTER_CLIENT": "RTR+C",
+    "REPEATER": "RPTR",
+    "TRACKER": "TRK",
+    "SENSOR": "SENSOR",
+    "TAK": "TAK",
+    "TAK_TRACKER": "TAK-T",
+    "CLIENT_MUTE": "MUTE",
+    "CLIENT_HIDDEN": "HIDN",
+    "LOST_AND_FOUND": "L+F",
+}
+
+
 class NodesPanel(Static):
     DEFAULT_CSS = (
         "NodesPanel { border: round $surface; padding: 0 1; height: 6; overflow-y: auto; }"
@@ -147,6 +161,12 @@ class NodesPanel(Static):
                 # short name + node id
                 txt.append(f" {n.short_name:<6}", style="bold cyan")
                 txt.append(f"  {nid}  ", style="dim")
+                # role
+                role_label = _ROLE_SHORT.get(n.role, n.role)
+                if role_label:
+                    txt.append(f"{role_label:<7}", style="magenta")
+                else:
+                    txt.append(" " * 7)
                 # hops
                 if n.hops_away is not None:
                     hop_str = "direct" if n.hops_away == 0 else f"{n.hops_away}hop"
@@ -901,6 +921,8 @@ class MeshtopApp(App[None]):
                 n.battery_level = existing.battery_level
             if n.voltage is None:
                 n.voltage = existing.voltage
+            if not n.role:
+                n.role = existing.role
         self._mesh_nodes[n.node_id] = n
         if not self._local_node_id or n.node_id == self._local_node_id:
             self._local_node_long = n.long_name
