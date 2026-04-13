@@ -5,27 +5,27 @@ description = "GPS bridge for Meshtastic devices — serial, BLE, TCP and LoRa/M
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "bleak>=0.21",
-    "cryptography>=46.0.5",
-    "loguru>=0.7",
+    "bleak>=3.0.1",
+    "cryptography>=46.0.7",
+    "loguru>=0.7.3",
     "meshtastic>=2.7.8",
-    "paho-mqtt>=2.0",
-    "pydantic>=2.0",
+    "paho-mqtt>=2.1.0",
+    "pydantic>=2.12.5",
     "pynmea2>=1.19",
     "pyserial>=3.5",
-    "rich>=13.0",
-    "textual>=0.80.0",
-    "tomli-w>=1.0",
+    "rich>=15.0.0",
+    "textual>=8.2.3",
+    "tomli-w>=1.2.0",
     "typer>=0.24.1",
 ]
 
 [dependency-groups]
 dev = [
-    "commitizen>=4.0",
-    "pylint>=3.0",
-    "pyinstaller>=6.0",
-    "pytest>=8.0",
-    "ruff>=0.15",
+    "commitizen>=4.13.10",
+    "pylint>=4.0.5",
+    "pyinstaller>=6.19.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.10",
 ]
 
 [build-system]
