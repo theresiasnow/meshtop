@@ -1,3 +1,9 @@
+## v0.7.0 (2026-03-27)
+
+### Feat
+
+- **tui**: move local node identity to subtitle bar (#13)
+
 ## v0.6.0 (2026-03-27)
 
 ### Feat
