@@ -41,6 +41,7 @@ class NodeInfo:
     last_heard: datetime | None = None
     battery_level: int | None = None
     voltage: float | None = None
+    source_type: str = "mesh"  # "mesh" | "aprs" | "js8call"
 
 
 @dataclass
@@ -50,6 +51,7 @@ class TextMessage:
     text: str = ""
     channel: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    source_type: str = "mesh"  # "mesh" | "aprs" | "js8call"
 
 
 @dataclass

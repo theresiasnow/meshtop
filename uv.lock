@@ -30,6 +30,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aprslib"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/2b/3c051f7bf65cb684040dfc13713d8836b72615f3b811107736aee59cab0d/aprslib-0.7.2.tar.gz", hash = "sha256:c20d2568ab8728a0526b4c95952c6022433d462674abdfb0fd86b2e50ed3c097", size = 25826, upload-time = "2022-07-10T12:45:13.214Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/b4/4b82e41dc007cfa68ee076ef905b823f841e4ce868fe7ee8b22cfe26796a/aprslib-0.7.2-py2.py3-none-any.whl", hash = "sha256:db09eac4c5f44b172e15399350147370fdafdd8f6befd69b697fbced8c83e7c6", size = 44746, upload-time = "2022-07-10T12:45:11.607Z" },
+]
+
+[[package]]
 name = "argcomplete"
 version = "3.6.3"
 source = { registry = "https://pypi.org/simple" }
@@ -375,6 +384,15 @@ wheels = [
 ]
 
 [[package]]
+name = "maidenhead"
+version = "1.8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/8e/57498adbd28d3e1a877f7f0498d84a02ff9f607ea5c36c365c84a97bd77b/maidenhead-1.8.0.tar.gz", hash = "sha256:38f318fbdf29ec995bd45e81f33bfa1f905129a154f0aa0334452f90e6c705bf", size = 8788, upload-time = "2025-05-25T06:27:58.786Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/82/167553db9cff18f759048f6d90bf8348bae7b24c652dc2fbae6f87fa8a66/maidenhead-1.8.0-py3-none-any.whl", hash = "sha256:ddc33fb370e0c3ce917be6040474ecb4c27ccc33b3dc9348536b73b5884bb68a", size = 9337, upload-time = "2025-05-25T06:27:57.124Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -475,9 +493,11 @@ name = "meshtop"
 version = "0.6.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aprslib" },
     { name = "bleak" },
     { name = "cryptography" },
     { name = "loguru" },
+    { name = "maidenhead" },
     { name = "meshtastic" },
     { name = "paho-mqtt" },
     { name = "pydantic" },
@@ -500,9 +520,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aprslib", specifier = ">=0.7" },
     { name = "bleak", specifier = ">=0.21" },
     { name = "cryptography", specifier = ">=46.0.5" },
     { name = "loguru", specifier = ">=0.7" },
+    { name = "maidenhead", specifier = ">=1.0" },
     { name = "meshtastic", specifier = ">=2.7.8" },
     { name = "paho-mqtt", specifier = ">=2.0" },
     { name = "pydantic", specifier = ">=2.0" },

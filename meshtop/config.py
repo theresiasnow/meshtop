@@ -124,12 +124,47 @@ class RigtopConfig(BaseModel):
     port: int = 10111
 
 
+class TncSourceConfig(BaseModel):
+    enabled: bool = False
+    host: str = "localhost"
+    port: int = 8001  # Direwolf default KISS TCP port
+    callsign: str = "N0CALL"
+    ssid: int = 0
+    beacon_interval: int = 600  # seconds; 0 = off
+
+
+class Js8CallSourceConfig(BaseModel):
+    enabled: bool = False
+    host: str = "localhost"
+    port: int = 2237  # JS8Call API default port
+    callsign: str = "N0CALL"
+    poll_interval: int = 10  # inbox poll in seconds
+
+
+class RigctldConfig(BaseModel):
+    enabled: bool = False
+    host: str = "localhost"
+    port: int = 4532  # rigctld default port
+    poll_interval: int = 5  # seconds
+
+
+class BridgeConfig(BaseModel):
+    mesh_to_aprs: bool = False
+    mesh_to_js8call: bool = False
+    aprs_to_mesh: bool = False
+    js8call_to_mesh: bool = False
+
+
 class Config(BaseModel):
     source: SourceConfig = SourceConfig()
     nmea_server: NmeaServerConfig = NmeaServerConfig()
     aprs: AprsConfig = AprsConfig()
     gpsd: GpsdConfig = GpsdConfig()
     rigtop: RigtopConfig = RigtopConfig()
+    tnc: TncSourceConfig = TncSourceConfig()
+    js8call: Js8CallSourceConfig = Js8CallSourceConfig()
+    radio: RigctldConfig = RigctldConfig()
+    bridge: BridgeConfig = BridgeConfig()
 
 
 def load_config(path: Path) -> Config:
