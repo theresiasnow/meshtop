@@ -52,9 +52,7 @@ class MessageBridge:
                 continue
             try:
                 sender.send_message(msg.from_id, msg.text)
-                logger.info(
-                    f"Bridge: {src_type} → {target_type}: [{msg.from_id}] {msg.text[:40]}"
-                )
+                logger.info(f"Bridge: {src_type} → {target_type}: [{msg.from_id}] {msg.text[:40]}")
             except Exception as e:
                 logger.warning(f"Bridge send error ({src_type} → {target_type}): {e}")
 

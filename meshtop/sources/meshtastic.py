@@ -232,7 +232,7 @@ class MeshtasticSource:
             field = u.DESCRIPTOR.fields_by_name["role"]
             role_name = field.enum_type.values_by_number[u.role].name
             role = "" if role_name == "CLIENT" else role_name
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             role = ""
         node = NodeInfo(
             node_id=f"!{getattr(packet, 'from'):08x}",

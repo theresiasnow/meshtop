@@ -1081,8 +1081,7 @@ class MeshtopApp(App[None]):
         }
         src_tag = _src_tags.get(m.source_type, f"[dim]\\[{m.source_type}][/]")
         self.query_one("#msg-log", RichLog).write(
-            f"[dim]{ts}[/]  {src_tag}{ch}"
-            f"  [cyan]{m.from_id}[/] [dim]→[/] {m.to_id}\n  {m.text}"
+            f"[dim]{ts}[/]  {src_tag}{ch}  [cyan]{m.from_id}[/] [dim]→[/] {m.to_id}\n  {m.text}"
         )
 
     def _update_subtitle(self) -> None:
