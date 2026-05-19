@@ -48,11 +48,14 @@ def fire_initial_nodes(
             if on_nodeinfo and "user" in node:
                 u = node["user"]
                 lh = node.get("lastHeard")
+                raw_role = u.get("role", "")
+                role = "" if raw_role == "CLIENT" else raw_role
                 on_nodeinfo(
                     NodeInfo(
                         node_id=u.get("id", node_id),
                         long_name=u.get("longName", ""),
                         short_name=u.get("shortName", ""),
+                        role=role,
                         snr=node.get("snr"),
                         hops_away=node.get("hopsAway"),
                         last_heard=datetime.fromtimestamp(lh, UTC) if lh else None,
@@ -173,11 +176,14 @@ def _node(user: dict, from_id: str, packet: dict, cb: Callable) -> None:
     hop_start = packet.get("hopStart", 0)
     hop_limit = packet.get("hopLimit", 0)
     hops_away = (hop_start - hop_limit) if hop_start else None
+    raw_role = user.get("role", "")
+    role = "" if raw_role == "CLIENT" else raw_role
     cb(
         NodeInfo(
             node_id=user.get("id", from_id),
             long_name=user.get("longName", ""),
             short_name=user.get("shortName", ""),
+            role=role,
             snr=packet.get("rxSnr"),
             rssi=packet.get("rxRssi"),
             hops_away=hops_away,

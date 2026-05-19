@@ -41,3 +41,34 @@ port    = 2947
 [rigtop]
 enabled = false
 port    = 10111
+
+# ── APRS over RF via Direwolf KISS TCP ───────────────────────────────────────
+[tnc]
+enabled          = false
+host             = "localhost"
+port             = 8001             # Direwolf KISSPORT (kissport 8001 in Direwolf.conf)
+callsign         = "N0CALL"
+ssid             = 9
+beacon_interval  = 600              # auto-beacon position every N seconds; 0 = off
+
+# ── JS8Call two-way messaging ─────────────────────────────────────────────────
+[js8call]
+enabled       = false
+host          = "localhost"
+port          = 2237                # JS8Call TCP API (Settings → Reporting → TCP Server)
+callsign      = "N0CALL"
+poll_interval = 10                  # inbox poll in seconds
+
+# ── rigctld radio status ──────────────────────────────────────────────────────
+[radio]
+enabled       = false
+host          = "localhost"
+port          = 4532                # rigctld default port (hamlib)
+poll_interval = 5                   # status poll in seconds
+
+# ── Message bridge ────────────────────────────────────────────────────────────
+[bridge]
+mesh_to_aprs     = false  # forward Meshtastic text messages → APRS-RF
+mesh_to_js8call  = false  # forward Meshtastic text messages → JS8Call
+aprs_to_mesh     = false  # forward APRS-RF messages → Meshtastic
+js8call_to_mesh  = false  # forward JS8Call messages → Meshtastic

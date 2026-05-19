@@ -8,6 +8,7 @@ import typer
 from loguru import logger
 from rich.console import Console
 
+from meshtop.bridge import MessageBridge
 from meshtop.config import load_config
 from meshtop.position import Position
 from meshtop.sinks.aprs import AprsSink
@@ -161,6 +162,26 @@ def main(
         rigtop_sink.start()
         sinks.append(rigtop_sink)
 
+    # Start radio sources
+    tnc_src = None
+    js8call_src = None
+    rigctld_mon = None
+
+    if cfg.tnc.enabled:
+        from meshtop.sources.aprs_tnc import AprsTncSource
+
+        tnc_src = AprsTncSource(cfg.tnc)
+
+    if cfg.js8call.enabled:
+        from meshtop.sources.js8call import Js8CallSource
+
+        js8call_src = Js8CallSource(cfg.js8call)
+
+    if cfg.radio.enabled:
+        from meshtop.monitors.rigctld import RigctldMonitor
+
+        rigctld_mon = RigctldMonitor(cfg.radio)
+
     def _dispatch_position(pos: Position) -> None:
         if aprs_sink:
             aprs_sink.send(pos)
@@ -170,6 +191,8 @@ def main(
             gpsd_sink.send(pos)
         if rigtop_sink:
             rigtop_sink.send(pos)
+        if tnc_src:
+            tnc_src.update_position(pos)
 
     if tui:
         from meshtop.tui import MeshtopApp
@@ -180,6 +203,9 @@ def main(
             nmea=nmea_server,
             gpsd=gpsd_sink,
             rigtop=rigtop_sink,
+            tnc=tnc_src,
+            js8call=js8call_src,
+            rigctld=rigctld_mon,
             serial_port=cfg.source.port,
         )
         if aprs_sink:
@@ -195,8 +221,25 @@ def main(
         def on_nodeinfo(n: NodeInfo) -> None:
             tui_app.on_nodeinfo(n)
 
+        # Bridge: routes messages between radio and mesh sources
+        class _MeshSender:
+            def send_message(self, dest: str, text: str) -> None:
+                from meshtop import mesh_sender
+
+                iface = tui_app._get_iface() if tui_app._get_iface else None
+                mesh_sender.send_text(cfg.source.lora, cfg.source.port, dest, text, iface=iface)
+
+        _bridge_senders: dict = {"mesh": _MeshSender()}
+        if tnc_src:
+            _bridge_senders["aprs"] = tnc_src
+        if js8call_src:
+            _bridge_senders["js8call"] = js8call_src
+
+        bridge = MessageBridge(cfg.bridge, _bridge_senders)
+
         def on_text(m: TextMessage) -> None:
             tui_app.on_text(m)
+            bridge.route(m)
 
         def on_traceroute(t) -> None:
             tui_app.on_traceroute(t)
@@ -273,6 +316,35 @@ def main(
         tui_app._on_disconnect = on_disconnect  # type: ignore[attr-defined]
         tui_app._get_iface = lambda: getattr(src_ref[0], "_iface", None) if src_ref[0] else None  # type: ignore[attr-defined]
         tui_app._save_channels = _save_channels  # type: ignore[attr-defined]
+
+        # Start radio sources in background threads (after TUI event loop is live)
+        def _start_radio_sources() -> None:
+            if tnc_src:
+                tnc_src._on_position = on_position
+                tnc_src._on_nodeinfo = on_nodeinfo
+                tnc_src._on_text = on_text
+                tnc_src._on_status = lambda ok: tui_app.call_from_thread(
+                    lambda: tui_app.on_tnc_status(ok)
+                )
+                tnc_src.start()
+            if js8call_src:
+                js8call_src._on_position = on_position
+                js8call_src._on_nodeinfo = on_nodeinfo
+                js8call_src._on_text = on_text
+                js8call_src._on_status = lambda ok: tui_app.call_from_thread(
+                    lambda: tui_app.on_js8call_status(ok)
+                )
+                js8call_src.start()
+            if rigctld_mon:
+                rigctld_mon._on_radio_status = lambda s: tui_app.call_from_thread(
+                    lambda: tui_app.on_radio_status(s)
+                )
+                rigctld_mon._on_connected = lambda ok: tui_app.call_from_thread(
+                    lambda: tui_app.on_rigctld_connected(ok)
+                )
+                rigctld_mon.start()
+
+        threading.Thread(target=_start_radio_sources, daemon=True, name="radio-start").start()
 
         # MQTT node observer — runs always in the background to collect node info
         # from the broader mesh, regardless of whether primary source is BLE/serial/lora.
@@ -361,6 +433,12 @@ def main(
                     sink.stop()
                 except Exception:
                     pass
+            for radio_src in [tnc_src, js8call_src, rigctld_mon]:
+                if radio_src:
+                    try:
+                        radio_src.stop()
+                    except Exception:
+                        pass
             import os
 
             os._exit(0)

@@ -29,15 +29,19 @@ from textual.widgets import (
 )
 
 from meshtop.config import ChannelConfig
+from meshtop.monitors.rigctld import RadioStatus
 from meshtop.position import Position
 from meshtop.sources.meshtastic import DeviceMetrics, NodeInfo, TextMessage, TraceRoute
 
 if TYPE_CHECKING:
     from meshtop.config import Config
+    from meshtop.monitors.rigctld import RigctldMonitor
     from meshtop.sinks.aprs import AprsSink
     from meshtop.sinks.gpsd import GpsdSink
     from meshtop.sinks.nmea_server import NmeaServer
     from meshtop.sinks.rigtop import RigtopSink
+    from meshtop.sources.aprs_tnc import AprsTncSource
+    from meshtop.sources.js8call import Js8CallSource
 
 
 # ── Panel widgets ─────────────────────────────────────────────────────────────
@@ -128,6 +132,54 @@ class TelemetryPanel(Static):
         self.update(txt)
 
 
+class RadioPanel(Static):
+    DEFAULT_CSS = (
+        "RadioPanel { border: round $primary; padding: 0 1; height: 4; overflow-y: auto; }"
+    )
+
+    def on_mount(self) -> None:
+        self.border_title = "Radio"
+        self.render_data(None, False)
+
+    def render_data(self, status: RadioStatus | None, connected: bool) -> None:
+        txt = Text()
+        icon = "●" if connected else "○"
+        icon_style = "bold green" if connected else "dim red"
+        txt.append(f" {icon} rigctld  ", style=icon_style)
+        if status and connected and status.freq_hz > 0:
+            freq_mhz = status.freq_hz / 1_000_000
+            txt.append(f"{freq_mhz:.3f} MHz  ", style="bold white")
+            txt.append(f"{status.mode}  ", style="cyan")
+            # S-meter: rigctld STRENGTH is in dBm relative to S9 (-73 dBm)
+            # S9 = -73 dBm, each S-unit = 6 dB; approximate display
+            s_val = max(0.0, (status.signal_strength + 127) / 6)
+            bar_w = 10
+            filled = min(bar_w, int(s_val))
+            bar = "█" * filled + "░" * (bar_w - filled)
+            s_style = "green" if s_val >= 7 else "yellow" if s_val >= 4 else "dim"
+            txt.append(f"S{min(9, int(s_val))} ", style=s_style)
+            txt.append(bar, style=s_style)
+        elif connected:
+            txt.append("connected", style="dim")
+        else:
+            txt.append("not connected", style="dim")
+        self.update(txt)
+
+
+_ROLE_SHORT: dict[str, str] = {
+    "ROUTER": "ROUTER",
+    "ROUTER_CLIENT": "RTR+C",
+    "REPEATER": "RPTR",
+    "TRACKER": "TRK",
+    "SENSOR": "SENSOR",
+    "TAK": "TAK",
+    "TAK_TRACKER": "TAK-T",
+    "CLIENT_MUTE": "MUTE",
+    "CLIENT_HIDDEN": "HIDN",
+    "LOST_AND_FOUND": "L+F",
+}
+
+
 class NodesPanel(Static):
     DEFAULT_CSS = (
         "NodesPanel { border: round $surface; padding: 0 1; height: 6; overflow-y: auto; }"
@@ -147,6 +199,20 @@ class NodesPanel(Static):
                 # short name + node id
                 txt.append(f" {n.short_name:<6}", style="bold cyan")
                 txt.append(f"  {nid}  ", style="dim")
+                # source tag for non-mesh nodes
+                src = n.source_type if n.source_type != "mesh" else ""
+                if src == "aprs":
+                    txt.append("(RF)  ", style="yellow")
+                elif src == "js8call":
+                    txt.append("(JS8) ", style="green")
+                else:
+                    txt.append(" " * 6)
+                # role
+                role_label = _ROLE_SHORT.get(n.role, n.role)
+                if role_label:
+                    txt.append(f"{role_label:<7}", style="magenta")
+                else:
+                    txt.append(" " * 7)
                 # hops
                 if n.hops_away is not None:
                     hop_str = "direct" if n.hops_away == 0 else f"{n.hops_away}hop"
@@ -192,6 +258,10 @@ class SinksPanel(Static):
         rigtop: RigtopSink | None,
         beacon_count: int,
         beacon_enabled: bool,
+        tnc_enabled: bool = False,
+        tnc_connected: bool = False,
+        js8call_enabled: bool = False,
+        js8call_connected: bool = False,
     ) -> None:
         txt = Text()
 
@@ -242,6 +312,13 @@ class SinksPanel(Static):
             row(
                 True, "rigtop", "tcp", "listening", f"  {nc} client{'s' if nc != 1 else ''}  :10111"
             )
+
+        if tnc_enabled:
+            status = "connected" if tnc_connected else "connecting"
+            row(tnc_connected, "APRS TNC", "kiss", status)
+        if js8call_enabled:
+            status = "connected" if js8call_connected else "connecting"
+            row(js8call_connected, "JS8Call", "api", status)
 
         self.update(txt)
 
@@ -631,6 +708,7 @@ class MeshtopApp(App[None]):
     #top-row { height: 12; }
     PositionPanel { width: 1fr; }
     TelemetryPanel { width: 1fr; }
+    RadioPanel { height: 4; }
     #event-log { height: 1fr; border: round $surface; }
     #msg-log   { height: 12;  border: round yellow; }
     #cmd-bar {
@@ -692,6 +770,26 @@ class MeshtopApp(App[None]):
             super().__init__()
             self.t = t
 
+    class RadioStatusReceived(Message):
+        def __init__(self, status: RadioStatus) -> None:
+            super().__init__()
+            self.status = status
+
+    class RadioConnected(Message):
+        def __init__(self, connected: bool) -> None:
+            super().__init__()
+            self.connected = connected
+
+    class TncStatus(Message):
+        def __init__(self, connected: bool) -> None:
+            super().__init__()
+            self.connected = connected
+
+    class Js8CallStatus(Message):
+        def __init__(self, connected: bool) -> None:
+            super().__init__()
+            self.connected = connected
+
     def __init__(
         self,
         cfg: Config,
@@ -699,6 +797,9 @@ class MeshtopApp(App[None]):
         nmea: NmeaServer | None = None,
         gpsd: GpsdSink | None = None,
         rigtop: RigtopSink | None = None,
+        tnc: AprsTncSource | None = None,
+        js8call: Js8CallSource | None = None,
+        rigctld: RigctldMonitor | None = None,
         serial_port: str = "",
     ) -> None:
         super().__init__()
@@ -707,6 +808,9 @@ class MeshtopApp(App[None]):
         self._nmea = nmea
         self._gpsd = gpsd
         self._rigtop = rigtop
+        self._tnc = tnc
+        self._js8call = js8call
+        self._rigctld = rigctld
         self._serial_port = serial_port
         self._src_connected = False
         self._beacon_count = 0
@@ -716,6 +820,10 @@ class MeshtopApp(App[None]):
         self._local_node_id: str = ""  # set by cli._drain after connect
         self._local_node_long: str = ""
         self._local_node_short: str = ""
+        self._tnc_connected = False
+        self._js8call_connected = False
+        self._radio_status: RadioStatus | None = None
+        self._rigctld_connected = False
         # node_id -> NodeInfo, insertion order = heard order
         self._mesh_nodes: dict[str, NodeInfo] = {}
         # Set from cli.py after construction: (source_type, device) -> error_str | None
@@ -731,6 +839,8 @@ class MeshtopApp(App[None]):
         with Horizontal(id="top-row"):
             yield PositionPanel(id="pos-panel")
             yield TelemetryPanel(id="tel-panel")
+        if self._cfg.radio.enabled:
+            yield RadioPanel(id="radio-panel")
         yield SinksPanel(id="sinks-panel")
         yield NodesPanel(id="nodes-panel")
         yield RichLog(id="event-log", highlight=True, markup=True)
@@ -811,6 +921,10 @@ class MeshtopApp(App[None]):
             rigtop=self._rigtop,
             beacon_count=self._beacon_count,
             beacon_enabled=self._beacon_enabled,
+            tnc_enabled=self._cfg.tnc.enabled,
+            tnc_connected=self._tnc_connected,
+            js8call_enabled=self._cfg.js8call.enabled,
+            js8call_connected=self._js8call_connected,
         )
 
     # ── Thread-safe callbacks (post non-blocking messages to the event loop) ──
@@ -835,6 +949,18 @@ class MeshtopApp(App[None]):
 
     def on_traceroute(self, t: TraceRoute) -> None:
         self.post_message(MeshtopApp.TraceRouteReceived(t))
+
+    def on_radio_status(self, status: RadioStatus) -> None:
+        self.post_message(MeshtopApp.RadioStatusReceived(status))
+
+    def on_rigctld_connected(self, connected: bool) -> None:
+        self.post_message(MeshtopApp.RadioConnected(connected))
+
+    def on_tnc_status(self, connected: bool) -> None:
+        self.post_message(MeshtopApp.TncStatus(connected))
+
+    def on_js8call_status(self, connected: bool) -> None:
+        self.post_message(MeshtopApp.Js8CallStatus(connected))
 
     # ── Message handlers (run on the event loop) ──────────────────────────────
 
@@ -863,6 +989,26 @@ class MeshtopApp(App[None]):
         self.query_one("#event-log", RichLog).write(
             f"[dim]{ts}[/]  [magenta]TRACE[/]  from {t.from_id}: {hops}"
         )
+
+    def on_meshtop_app_radio_status_received(self, msg: RadioStatusReceived) -> None:
+        self._radio_status = msg.status
+        panel = self.query("#radio-panel")
+        if panel:
+            panel.first(RadioPanel).render_data(msg.status, self._rigctld_connected)
+
+    def on_meshtop_app_radio_connected(self, msg: RadioConnected) -> None:
+        self._rigctld_connected = msg.connected
+        panel = self.query("#radio-panel")
+        if panel:
+            panel.first(RadioPanel).render_data(self._radio_status, msg.connected)
+
+    def on_meshtop_app_tnc_status(self, msg: TncStatus) -> None:
+        self._tnc_connected = msg.connected
+        self._refresh_sinks()
+
+    def on_meshtop_app_js8_call_status(self, msg: Js8CallStatus) -> None:
+        self._js8call_connected = msg.connected
+        self._refresh_sinks()
 
     # ── Main-thread handlers ──────────────────────────────────────────────────
 
@@ -901,6 +1047,8 @@ class MeshtopApp(App[None]):
                 n.battery_level = existing.battery_level
             if n.voltage is None:
                 n.voltage = existing.voltage
+            if not n.role:
+                n.role = existing.role
         self._mesh_nodes[n.node_id] = n
         if not self._local_node_id or n.node_id == self._local_node_id:
             self._local_node_long = n.long_name
@@ -926,9 +1074,14 @@ class MeshtopApp(App[None]):
     def _handle_text(self, m: TextMessage) -> None:
         ts = datetime.now(UTC).strftime("%H:%M:%S")
         ch = f" [dim]{m.channel}[/]" if m.channel else ""
+        _src_tags = {
+            "mesh": "[bold cyan]\\[MESH][/]",
+            "aprs": "[bold yellow]\\[APRS][/]",
+            "js8call": "[bold green]\\[JS8][/]",
+        }
+        src_tag = _src_tags.get(m.source_type, f"[dim]\\[{m.source_type}][/]")
         self.query_one("#msg-log", RichLog).write(
-            f"[dim]{ts}[/]  [magenta]RX[/]{ch}"
-            f"  [cyan]{m.from_id}[/] [dim]→[/] {m.to_id}\n  {m.text}"
+            f"[dim]{ts}[/]  {src_tag}{ch}  [cyan]{m.from_id}[/] [dim]→[/] {m.to_id}\n  {m.text}"
         )
 
     def _update_subtitle(self) -> None:
