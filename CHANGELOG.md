@@ -1,3 +1,9 @@
+## v0.8.0 (2026-05-19)
+
+### Feat
+
+- **radio**: Direwolf TNC, JS8Call, rigctld and message bridge (#16)
+
 ## v0.7.0 (2026-03-27)
 
 ### Feat
