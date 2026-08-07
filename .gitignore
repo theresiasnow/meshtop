@@ -13,4 +13,13 @@ meshtop.toml
 test_*.py
 .claude/*
 !.claude/settings.json
+# The pr-shepherd overlay is shared config, not local state: the skill BODY is
+# global (symlinked from the claude-skills spine) and reads these three files to
+# learn this repo's CI gates. Untracked, they would be invisible to everyone else
+# and absent from a fresh clone.
+!.claude/skills
+.claude/skills/*
+!.claude/skills/pr-shepherd
+.claude/skills/pr-shepherd/*
+!.claude/skills/pr-shepherd/references
 err.txt
